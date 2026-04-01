@@ -1,65 +1,97 @@
-import os, json
-from datetime import datetime
-from dotenv import load_dotenv
-import collector_helper as helper
-import ftp_collector as ftp_c
-import utils.sql_collector as sql_c
+import os
+from ftplib import FTP
 
-load_dotenv()
-config = helper.config
-METADATA_FILE = os.path.join(config['storage']['data_folder'], ".metadata.json")
+def sync_ftp_files(metadata, config):
+    """
+    Synchronizes local TEMP_DOWNLOADS with the remote FTP server.
+    Returns a list of updated files and the modified metadata.
+    """
+    temp_folder = os.path.join(config['storage']['data_folder'], 'TEMP_DOWNLOADS')
+    updated_files = []
+    remote_files_found = set()
+    
+    #Extensions we care about for the RAG system
+    VALID_EXTENSIONS = (
+        ".html", ".htm", ".php", ".txt", ".pdf", ".docx", 
+        ".doc",".jpg", ".jpeg", ".png", ".webp", ".mp4", 
+        ".webm"
+    )
 
-def load_metadata():
-    return json.load(open(METADATA_FILE)) if os.path.exists(METADATA_FILE) else {}
+    try:
+        host = os.getenv("FTP_HOST")
+        print(f"Connecting to FTP: {host}")
+        
+        ftp = FTP(host)
+        ftp.login(user=os.getenv("FTP_USER"), passwd=os.getenv("FTP_PASSWORD"))
+        
+        remote_root = os.getenv("FTP_REMOTE_PATH", "/")
+        ftp.cwd(remote_root)
 
-def run_master_collection():
-    metadata = load_metadata()
-    temp_folder = os.path.join(config['storage']['data_folder'], "TEMP_DOWNLOADS")
-    cache_folder = os.path.join(config['storage']['data_folder'], "CACHE_TEXT")
-    if not os.path.exists(cache_folder): os.makedirs(cache_folder)
+        def walk_recursive(remote_path, local_path):
+            """Internal helper to navigate FTP folders and download files."""
+            if not os.path.exists(local_path):
+                os.makedirs(local_path)
 
-    # 1. Sync FTP
-    _, metadata = ftp_c.sync_ftp_files(metadata, config)
+            try:
+                #mlsd is more reliable for metadata than nlstd
+                for name, facts in ftp.mlsd(path=remote_path):
+                    if name in (".", ".."): 
+                        continue
 
-    # 2. Process Files to Cache
-    for root, _, files in os.walk(temp_folder):
-        for fname in files:
-            f_path = os.path.join(root, fname)
-            rel_path = os.path.relpath(f_path, temp_folder)
-            c_path = os.path.join(cache_folder, rel_path.replace(os.sep, "_") + ".txt")
-            
-            if not os.path.exists(c_path) or os.path.getmtime(f_path) > os.path.getmtime(c_path):
-                ext = f_path.lower()
-                desc = ""
-                if ext.endswith(('.html', '.php')): desc = helper.extract_from_html_or_php(f_path)
-                elif ext.endswith(('.jpg', '.png', '.webp')): desc = helper.describe_image_with_ai(f_path)
-                elif ext.endswith(('.mp4', '.mov')): desc = helper.process_video_with_ai(f_path)
-                elif ext.endswith('.pdf'): desc = helper.extract_from_pdf(f_path)
+                    remote_full_path = os.path.join(remote_path, name).replace("\\", "/")
+                    local_full_path = os.path.join(local_path, name)
+
+                    if facts['type'] == 'dir':
+                        #It's a folder, go deeper
+                        walk_recursive(remote_full_path, local_full_path)
+                    
+                    elif facts['type'] == 'file':
+                        if name.lower().endswith(VALID_EXTENSIONS):
+                            remote_files_found.add(remote_full_path)
+
+                            #Check modification time from server
+                            #MDTM is standard for getting file last-modified date
+                            response = ftp.sendcmd(f"MDTM {remote_full_path}")
+                            remote_mtime = response[4:]
+
+                            #Sync logic: Only download if it's new or timestamp changed
+                            if metadata.get(remote_full_path) != remote_mtime:
+                                print(f"Update: {remote_full_path} -> Downloading...")
+                                
+                                with open(local_full_path, "wb") as f:
+                                    ftp.retrbinary(f"RETR {remote_full_path}", f.write)
+                                
+                                metadata[remote_full_path] = remote_mtime
+                                updated_files.append(local_full_path)
+
+            except Exception as e:
+                print(f"Error while walking {remote_path}: {e}")
+
+        # Start the recursive sync
+        walk_recursive(remote_root, temp_folder)
+
+        #--- PURGE PHASE ---
+        #Remove local files that no longer exist on the FTP server
+        stored_paths = list(metadata.keys())
+        for path_in_meta in stored_paths:
+            if path_in_meta not in remote_files_found:
+                print(f"Was first deleted on server: {path_in_meta} -> Cleaning local copy...")
                 
-                with open(c_path, "w", encoding="utf-8") as f:
-                    f.write(desc if desc.strip() else "No relevant content found.")
+                rel_path = os.path.relpath(path_in_meta, remote_root)
+                local_to_delete = os.path.join(temp_folder, rel_path)
+                
+                if os.path.exists(local_to_delete):
+                    try:
+                        os.remove(local_to_delete)
+                    except Exception as e:
+                        print(f"Error deleting {local_to_delete}: {e}")
 
-    # 3. Assemble and Deduplicate
-    unique_lines = set()
-    master_lines = [f"CONTEXT UPDATED: {datetime.now()}\n"]
-    
-    # Add MySQL Data
-    master_lines.append(sql_c.collect_mysql_data(config))
+                del metadata[path_in_meta]
 
-    # Add Cached Files
-    for c_file in os.listdir(cache_folder):
-        with open(os.path.join(cache_folder, c_file), "r", encoding="utf-8") as f:
-            for line in f:
-                clean = line.strip()
-                if clean and clean not in unique_lines and "No relevant content" not in clean:
-                    unique_lines.add(clean)
-                    master_lines.append(clean)
+        ftp.quit()
+        print("FTP Sync completed successfully.")
+        return updated_files, metadata
 
-    with open(os.path.join(config['storage']['data_folder'], "master_context.txt"), "w", encoding="utf-8") as f:
-        f.write("\n".join(master_lines))
-    
-    with open(METADATA_FILE, "w") as f: json.dump(metadata, f)
-    print("Master Collection Complete.")
-
-if __name__ == "__main__":
-    run_master_collection()
+    except Exception as e:
+        print(f"FTP Fatal Error: {e}")
+        return [], metadata
