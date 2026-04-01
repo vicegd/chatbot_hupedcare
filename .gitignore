@@ -1,0 +1,16 @@
+# Entorno virtual
+.venv/
+venv/
+
+# Variables de entorno
+.env
+
+# Carpetas de datos y temporales
+data/
+temp/
+
+# Otros
+__pycache__/
+*.pyc
+.DS_Store
+TODO.txt
