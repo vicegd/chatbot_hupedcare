@@ -1,9 +1,9 @@
 import os, json
 from datetime import datetime
 from dotenv import load_dotenv
-import src.collector_helper as helper
-import src.ftp_collector as ftp_c
-import src.mysql_collector as sql_c
+import utils.collector_helper as helper
+import utils.ftp_collector as ftp_c
+import utils.mysql_collector as sql_c
 
 load_dotenv()
 config = helper.config

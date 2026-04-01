@@ -2,7 +2,7 @@ import requests
 import yaml
 
 def cargar_config():
-    with open("config.yaml", "r") as f:
+    with open("./config/config.yaml", "r") as f:
         return yaml.safe_load(f)
 
 def chat():

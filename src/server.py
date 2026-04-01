@@ -10,7 +10,7 @@ load_dotenv()
 
 # CARGADOR DE CONFIGURACIÓN
 def cargar_config():
-    with open("config.yaml", "r", encoding="utf-8") as f:
+    with open("./config/config.yaml", "r") as f:
         return yaml.safe_load(f)
 
 config = cargar_config()
