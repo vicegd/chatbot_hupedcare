@@ -42,8 +42,8 @@ This repository contains an advanced data ingestion system for RAG (Retrieval-Au
 ## Installation & Setup
 
 1. Clone the repository:
-   git clone https://github.com/your-user/your-rag-project.git
-   cd your-rag-project
+   git clone https://github.com/vicegd/chatbot_hupedcare
+   cd chatbot_hupedcare
 
 2. Install dependencies:
    pip install -r requirements.txt
