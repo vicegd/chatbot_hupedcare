@@ -18,7 +18,7 @@ config = cargar_config()
 app = FastAPI()
 client = OpenAI(
     base_url=config['ai']['base_url'], 
-    api_key=os.getenv("GROQ_API_KEY")
+    api_key=os.getenv("MODEL_API_KEY")
 )
 
 # MEMORIA COMPARTIDA
