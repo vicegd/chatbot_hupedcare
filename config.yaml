@@ -2,19 +2,20 @@
 ai:
   base_url: "https://api.groq.com/openai/v1"
   model: "llama-3.3-70b-versatile"
-  vision_model: "llama-3.2-11b-vision-preview"
+  vision_model: "meta-llama/llama-4-scout-17b-16e-instruct"
   system_prompt: "Eres un asistente experto. Usa el contexto para responder. Responde en el idioma del usuario."
 
 # Configuración del Sistema de Archivos
 storage:
   data_folder: "DATA"
-  local_temp_folder: "DATA/TEMP_DOWNLOADS" 
-  raw_html_folder: "DATA/RAW_HTML"
-  images_folder: "DATA/IMAGES"
-  videos_folder: "DATA/VIDEOS"
   refresh_interval_seconds: 3600
 
 # Configuración del Servidor
 server:
   host: "127.0.0.1"
   port: 8000
+
+database:
+  queries:
+    - "SELECT * FROM productos LIMIT 50"
+    - "SELECT * FROM logs_recientes ORDER BY fecha DESC LIMIT 20"
