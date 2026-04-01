@@ -16,28 +16,29 @@ This repository contains an advanced data ingestion system for RAG (Retrieval-Au
 
 ## Repository Structure
 
+```text
 /
 ├── src/
 │   ├── main.py                # Main workflow orchestrator
 │   ├── ftp_collector.py       # Remote sync module (FTP)
-│   ├── sql_collector.py       # Database extraction module
+│   ├── mysql_collector.py     # Database extraction module
 │   └── collector_helper.py    # File processors (PDF, Images, Video)
 ├── paper/                     # Scientific Paper (LaTeX)
 │   ├── main.tex               # Main article document
 │   ├── references.bib         # Study bibliography
-│   └── /figures               # Diagrams and charts for the paper
+│   └── /figures               # Diagrams and charts
 ├── config/
-│   └── config.yaml            # Model, query, and path configurations
-├── data/                      # System data (Ignored by Git)
-│   ├── TEMP_DOWNLOADS/        # Local mirror of the remote server
-│   ├── CACHE_TEXT/            # Plain text processed versions
-│   └── master_context.txt     # Final consolidated context file
+│   └── config.yaml            # Configuration file
+├── data/                      # (Ignored by Git)
+│   ├── TEMP_DOWNLOADS/        # Local mirror
+│   ├── CACHE_TEXT/            # Processed text versions
+│   └── master_context.txt     # Final consolidated context
 ├── .env.example               # Template for environment variables
-├── .gitignore                 # Configured to ignore sensitive data and binaries
-├── LICENSE                    # Project legal terms and conditions
+├── .gitignore                 # Git ignore rules
+├── LICENSE                    # Project license
 └── requirements.txt           # Python dependencies
 
-## 🛠️ Installation & Setup
+## Installation & Setup
 
 1. Clone the repository:
    git clone https://github.com/your-user/your-rag-project.git
@@ -54,13 +55,6 @@ This repository contains an advanced data ingestion system for RAG (Retrieval-Au
 4. Run the collection process:
    python src/main.py
 
-## 🎓 Scientific Paper
+## License
 
-This software is part of the methodology for the research paper:
-"Towards Efficient Multimodal Data Ingestion: Deduplication and Caching Strategies for RAG Systems in Constrained Environments."
-
-The paper's source code is located in the /paper directory and uses LaTeX to ensure academic quality and reproducibility of the technical results presented.
-
-## ⚖️ License
-
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE).
