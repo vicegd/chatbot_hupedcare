@@ -3,7 +3,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import utils.collector_helper as helper
 import utils.ftp_collector as ftp_c
-import utils.mysql_collector as sql_c
+import utils.sql_collector as sql_c
 
 load_dotenv()
 config = helper.config
