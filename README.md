@@ -37,6 +37,7 @@ This repository contains an advanced data ingestion system for RAG (Retrieval-Au
 ├── .gitignore                 # Git ignore rules
 ├── LICENSE                    # Project license
 └── requirements.txt           # Python dependencies
+```
 
 ## Installation & Setup
 
