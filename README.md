@@ -42,11 +42,16 @@ This repository contains an advanced data ingestion system for RAG (Retrieval-Au
 ## Installation & Setup
 
 1. Clone the repository:
-   git clone https://github.com/vicegd/chatbot_hupedcare
-   cd chatbot_hupedcare
+
+```bash
+    git clone https://github.com/vicegd/chatbot_hupedcare
+    cd chatbot_hupedcare
+```
 
 2. Install dependencies:
-   pip install -r requirements.txt
+```bash
+    pip install -r requirements.txt
+```
 
 3. Environment Configuration:
    - Create a .env file based on .env.example.
@@ -54,7 +59,9 @@ This repository contains an advanced data ingestion system for RAG (Retrieval-Au
    - Adjust parameters in config/config.yaml.
 
 4. Run the collection process:
-   python src/main.py
+```bash
+    python src/main.py
+```
 
 ## License
 
