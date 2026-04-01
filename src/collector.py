@@ -47,14 +47,18 @@ def run_master_collection():
                     if ext.endswith(('.html', '.php')): 
                         desc = helper.extract_from_html_or_php(f_path)
                     elif ext.endswith(('.jpg', '.png', '.jpeg', '.webp')): 
-                        desc = helper.describe_image_with_ai(f_path)
+                        desc = helper.extract_description_from_image_with_ai(f_path)
                     elif ext.endswith(('.mp4', '.webm', '.mov')): 
-                        desc = helper.process_video_with_ai(f_path)
+                        desc = helper.extract_description_from_video_with_ai(f_path)
+                    elif ext.endswith('.docx'):
+                        desc = helper.extract_from_docx(f_path)
+                    elif ext.endswith('.doc'):
+                        desc = helper.extract_from_doc(f_path)
                     elif ext.endswith('.pdf'): 
                         desc = helper.extract_from_pdf(f_path)
                     elif ext.endswith('.txt'):
                         with open(f_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            desc = helper.clean_text(f.read())
+                            desc = helper.extract_clean_text(f.read())
                
                     with open(c_path, "w", encoding="utf-8") as f:
                         f.write(desc if desc.strip() else "No relevant content found.")
@@ -65,8 +69,8 @@ def run_master_collection():
     unique_lines = set()
     master_lines = [f"SYSTEM CONTEXT - UPDATED: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"]
     
-    #5. Add MySQL Data
-    #master_lines.append(sql_c.collect_mysql_data(config))
+    #5. Add SQL Data
+    master_lines.append(sql_c.collect_sql_data(config))
 
     #6. Add Cached Files with Source Headers
     for c_file in os.listdir(cache_folder):

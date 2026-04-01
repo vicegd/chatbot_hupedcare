@@ -1,7 +1,10 @@
 import mysql.connector
 import os
 
-def collect_mysql_data(config):
+def collect_sql_data(config):
+    return "SQL Data Collection Placeholder - Implement your SQL queries here."
+
+def collect_sql_dataTEMP(config):
     print("Collecting data from MySQL...")
     text_output = "--- DATABASE EXPORT ---\n"
     try:
