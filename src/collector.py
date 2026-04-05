@@ -4,10 +4,10 @@ import utils.helper as helper
 import utils.ftp_collector as ftp_c
 import utils.sql_collector as sql_c
 
-config = helper.config
-metadata = helper.metadata
-
 def run_collector():
+    config = helper.config
+    metadata = helper.metadata
+
     temp_folder = os.path.join(config['storage']['data_folder'], "TEMP_DOWNLOADS")
     cache_folder = os.path.join(config['storage']['data_folder'], "CACHE_TEXT")
     
@@ -16,7 +16,7 @@ def run_collector():
 
     #1. SYNC FTP FILES
     print("1. SYNCING FTP FILES...")
-    #updated_files, metadata = ftp_c.sync_ftp_files(metadata, temp_folder)
+    updated_files, metadata = ftp_c.sync_ftp_files(metadata, temp_folder)
 
     #2. PURGE ORPHANED CACHE
     print("2. PURGING ORPHANED CACHE FILES...")
@@ -45,7 +45,7 @@ def run_collector():
                 desc = ""
                 
                 try:
-                    if ext.endswith(('.html', '.php')): 
+                    if ext.endswith(('.html', '.htm', '.php')): 
                         desc = helper.extract_from_html_or_php(f_path)
                     elif ext.endswith(('.jpg', '.png', '.jpeg', '.webp')): 
                         desc = helper.extract_description_from_image_with_ai(f_path)
@@ -56,7 +56,7 @@ def run_collector():
                     elif ext.endswith('.docx'):
                         desc = helper.extract_from_docx(f_path)
                     elif ext.endswith('.doc'):
-                        desc = helper.extract_from_doc(f_path)
+                     desc = helper.extract_from_doc(f_path)
                     elif ext.endswith('.pdf'): 
                           desc = helper.extract_from_pdf(f_path)
                     elif ext.endswith('.txt'):
@@ -74,8 +74,8 @@ def run_collector():
     master_lines = [f"SYSTEM CONTEXT - UPDATED: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"]
     
     #5. ADD SQL DATA
-    print
-    # master_lines.append(sql_c.collect_sql_data(config))
+    print("5. ADDING SQL DATA...")
+    master_lines.append(sql_c.collect_sql_data(config))
 
     #6. ADD CACHED FILES WITH SOURCE HEADERS
     print("6. ADDING CACHED FILES WITH SOURCE HEADERS...")
