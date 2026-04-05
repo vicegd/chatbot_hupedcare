@@ -2,9 +2,10 @@
 ai:
   base_url: "https://api.groq.com/openai/v1"
   model: "llama-3.3-70b-versatile"
-  vision_model: "meta-llama/llama-4-scout-17b-16e-instruct"
   system_prompt: "Eres un asistente experto. Usa el contexto para responder. Responde en el idioma del usuario."
-
+  transcription_model: "whisper-large-v3"
+  vision_model: "meta-llama/llama-4-scout-17b-16e-instruct"
+  
 # Configuración del Sistema de Archivos
 storage:
   data_folder: "DATA"

@@ -1,12 +1,11 @@
 import os
 from ftplib import FTP
 
-def sync_ftp_files(metadata, config):
+def sync_ftp_files(metadata, temp_folder):
     """
     Synchronizes local TEMP_DOWNLOADS with the remote FTP server.
     Returns a list of updated files and the modified metadata.
     """
-    temp_folder = os.path.join(config['storage']['data_folder'], 'TEMP_DOWNLOADS')
     updated_files = []
     remote_files_found = set()
     
@@ -14,7 +13,7 @@ def sync_ftp_files(metadata, config):
     VALID_EXTENSIONS = (
         ".html", ".htm", ".php", ".txt", ".pdf", ".docx", 
         ".doc",".jpg", ".jpeg", ".png", ".webp", ".mp4", 
-        ".webm"
+        ".webm", ".mov", ".mp3", ".wav", ".m4a", ".flac"
     )
 
     try:
@@ -70,8 +69,7 @@ def sync_ftp_files(metadata, config):
         # Start the recursive sync
         walk_recursive(remote_root, temp_folder)
 
-        #--- PURGE PHASE ---
-        #Remove local files that no longer exist on the FTP server
+        #PURGE local files that no longer exist on the server and clean metadata
         stored_paths = list(metadata.keys())
         for path_in_meta in stored_paths:
             if path_in_meta not in remote_files_found:

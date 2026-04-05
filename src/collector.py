@@ -1,24 +1,25 @@
 import os, json
 from datetime import datetime
-import utils.collector_helper as helper
+import utils.helper as helper
 import utils.ftp_collector as ftp_c
 import utils.sql_collector as sql_c
 
 config = helper.config
 metadata = helper.metadata
 
-def run_master_collection():
+def run_collector():
     temp_folder = os.path.join(config['storage']['data_folder'], "TEMP_DOWNLOADS")
     cache_folder = os.path.join(config['storage']['data_folder'], "CACHE_TEXT")
     
     if not os.path.exists(temp_folder): os.makedirs(temp_folder)
     if not os.path.exists(cache_folder): os.makedirs(cache_folder)
 
-    #1. SYNC FTP
-    _, metadata = ftp_c.sync_ftp_files(metadata, config)
+    #1. SYNC FTP FILES
+    print("1. SYNCING FTP FILES...")
+    #updated_files, metadata = ftp_c.sync_ftp_files(metadata, temp_folder)
 
     #2. PURGE ORPHANED CACHE
-    print("Purging orphaned cache files...")
+    print("2. PURGING ORPHANED CACHE FILES...")
     current_temp_files = set()
     for root, _, files in os.walk(temp_folder):
         for fname in files:
@@ -30,8 +31,8 @@ def run_master_collection():
             print(f"Cleanup: Removing {c_file} (no longer in server)")
             os.remove(os.path.join(cache_folder, c_file))
 
-    #3. PROCESS FILES (Aquí estaba el 'pass')
-    print(f"Processing updates in {temp_folder}...")
+    #3. PROCESS FILES
+    print(f"3. PROCESSING UPDATES IN {temp_folder}...")
     for root, _, files in os.walk(temp_folder):
         for fname in files:
             f_path = os.path.join(root, fname)
@@ -48,6 +49,8 @@ def run_master_collection():
                         desc = helper.extract_from_html_or_php(f_path)
                     elif ext.endswith(('.jpg', '.png', '.jpeg', '.webp')): 
                         desc = helper.extract_description_from_image_with_ai(f_path)
+                    elif ext.endswith(('.mp3', '.wav', '.m4a', '.flac')):
+                        desc = helper.extract_description_from_audio_with_ai(f_path)
                     elif ext.endswith(('.mp4', '.webm', '.mov')): 
                         desc = helper.extract_description_from_video_with_ai(f_path)
                     elif ext.endswith('.docx'):
@@ -55,24 +58,27 @@ def run_master_collection():
                     elif ext.endswith('.doc'):
                         desc = helper.extract_from_doc(f_path)
                     elif ext.endswith('.pdf'): 
-                        desc = helper.extract_from_pdf(f_path)
+                          desc = helper.extract_from_pdf(f_path)
                     elif ext.endswith('.txt'):
-                        with open(f_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            desc = helper.extract_clean_text(f.read())
+                          with open(f_path, 'r', encoding='utf-8', errors='ignore') as f:
+                             desc = helper.extract_clean_text(f.read())
                
                     with open(c_path, "w", encoding="utf-8") as f:
                         f.write(desc if desc.strip() else "No relevant content found.")
                 except Exception as e:
                     print(f"Error processing {fname}: {e}")
 
-    #4. ASSEMBLE AND DEDUPLICATE
+    # #4. ASSEMBLE MASTER CONTEXT
+    print("4. ASSEMBLING MASTER CONTEXT...")
     unique_lines = set()
     master_lines = [f"SYSTEM CONTEXT - UPDATED: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"]
     
-    #5. Add SQL Data
-    master_lines.append(sql_c.collect_sql_data(config))
+    #5. ADD SQL DATA
+    print
+    # master_lines.append(sql_c.collect_sql_data(config))
 
-    #6. Add Cached Files with Source Headers
+    #6. ADD CACHED FILES WITH SOURCE HEADERS
+    print("6. ADDING CACHED FILES WITH SOURCE HEADERS...")
     for c_file in os.listdir(cache_folder):
         source_label = c_file.replace(".txt", "").replace("_", "/")
         source_added = False
@@ -81,7 +87,7 @@ def run_master_collection():
             for line in f:
                 clean = line.strip()
                 # Filtros: no vacío, no repetido, no mensajes de error
-                if clean and clean not in unique_lines and "No relevant content" not in clean:
+                if clean and clean not in unique_lines and "No relevant content found." not in clean:
                     if not source_added:
                         master_lines.append(f"\n--- SOURCE: {source_label} ---")
                         source_added = True
@@ -90,14 +96,14 @@ def run_master_collection():
                     master_lines.append(clean)
 
     #7. SAVE EVERYTHING
+    print("7. SAVING MASTER CONTEXT...")
     output_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(master_lines))
     
-    with open(METADATA_FILE, "w") as f: 
-        json.dump(metadata, f, indent=4)
+    helper.save_metadata(metadata)
         
     print(f"Done! Context rebuilt at {output_path}")
 
 if __name__ == "__main__":
-    run_master_collection()
+    run_collector()
