@@ -11,14 +11,10 @@ import utils.helper as helper
 load_dotenv()
 config = helper.config
 
-# Disable local transformer warnings since we are using official API
-os.environ['TRANSFORMERS_OFFLINE'] = '1'
-
-# 2. EMBEDDING CONFIGURATION (Official OpenAI)
-# This model ensures superior semantic search, connecting terms like 'ferry' and 'ship'
+# 2. EMBEDDING CONFIGURATION 
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=os.getenv("MODEL_API_KEY"),
-    model_name=config['ai']['embedding_model']
+    model_name=config['embeddings']['embedding_model']
 )
 
 # 3. CHROMADB CONNECTION
@@ -26,7 +22,7 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
 db_path = os.path.join(config['storage']['data_folder'], "vector_db")
 chroma_client = chromadb.PersistentClient(path=db_path)
 
-# Retrieve the collection (Make sure to rebuild it with the new vector_processor first)
+# Retrieve the collection
 collection = chroma_client.get_collection(
     name="rag_context", 
     embedding_function=openai_ef
@@ -47,7 +43,7 @@ async def answer_user(item: Query):
         # 1. RETRIEVAL: Get chunks from ChromaDB
         results = collection.query(
             query_texts=[item.question],
-            n_results=6
+            n_results=config['embeddings']['top_k']
         )
         retrieved_context = "\n---\n".join(results['documents'][0])
         
@@ -66,7 +62,7 @@ async def answer_user(item: Query):
                 {"role": "system", "content": full_system_message},
                 {"role": "user", "content": item.question}
             ],
-            temperature=0.2
+            temperature=config['embeddings']['temperature']
         )
         
         return {

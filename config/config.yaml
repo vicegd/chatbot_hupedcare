@@ -8,9 +8,11 @@ ai:
                 Always use the language of the user's question in your answer."
   transcription_model: "whisper-1" 
   vision_model: "gpt-4o-mini"
-  embedding_model: "text-embedding-3-small"
 
-chunks:
+embeddings:
+  embedding_model: "text-embedding-3-small"
+  top_k: 6
+  temperature: 0.2
   max_chunk_size: 1500
   chunk_overlap: 200
   
