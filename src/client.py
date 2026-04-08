@@ -10,7 +10,7 @@ def chat():
     config = load_config()
     url = f"http://{config['server']['host']}:{config['server']['port']}/ask"
     
-    # Professional Header
+    # Header
     print(Style.BRIGHT + Fore.CYAN + "="*50)
     print(Style.BRIGHT + Fore.CYAN + "       HUPEDCARE CHATBOT - RESEARCH ASSISTANT")
     print(Style.BRIGHT + Fore.CYAN + "="*50)
@@ -20,7 +20,7 @@ def chat():
     while True:
         try:
             # 1. USER INPUT (Green color for your writing)
-            print(Style.BRIGHT + Fore.GREEN + ">> ", end=" ")
+            print(Style.BRIGHT + Fore.GREEN + ">>", end=" ")
             question = input()
 
             if question.lower() in ["salir", "exit", "wyjść", "sair", "çıkmak", "quit"]:
@@ -42,7 +42,7 @@ def chat():
             if response.status_code == 200:
                 answer = response.json()['response']
                 # 3. IA RESPONSE (Blue/Cyan color for the AI)
-                print(Style.BRIGHT + Fore.BLUE + "IA: " + Style.NORMAL + Fore.WHITE + answer + "\n")
+                print(Style.BRIGHT + Fore.BLUE + "<< " + Style.NORMAL + Fore.WHITE + answer + "\n")
             else:
                 print(Fore.RED + f"Server Error: {response.status_code}")
 
