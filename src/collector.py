@@ -1,12 +1,17 @@
-import os, json
+import os
 from datetime import datetime
 import utils.helper as helper
 import utils.ftp_collector as ftp_c
 import utils.sql_collector as sql_c
-import utils.vector_processor as vector_p
-import os
-os.environ['TRANSFORMERS_OFFLINE'] = '1'
-os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
+import hashlib
+
+def get_file_hash(filepath):
+    """Generates an MD5 hash of a file to detect if its content has changed."""
+    hasher = hashlib.md5()
+    with open(filepath, 'rb') as f:
+        buf = f.read()
+        hasher.update(buf)
+    return hasher.hexdigest()
 
 def run_collector():
     config = helper.config
@@ -55,8 +60,6 @@ def run_collector():
                         desc = helper.extract_description_from_image_with_ai(f_path)
                     elif ext.endswith(('.mp3', '.wav', '.m4a', '.flac')):
                         desc = helper.extract_description_from_audio_with_ai(f_path)
-                    elif ext.endswith(('.mp4', '.webm', '.mov')): 
-                        desc = helper.extract_description_from_video_with_ai(f_path)
                     elif ext.endswith('.docx'):
                         desc = helper.extract_from_docx(f_path)
                     elif ext.endswith('.doc'):
@@ -109,13 +112,31 @@ def run_collector():
 
     #8. UPDATE VECTOR DATABASE
     print("8. UPDATING VECTOR DATABASE (EMBEDDINGS)...")
-    try:
-        vector_p.update_vector_db()
-        print("Vector database updated successfully.")
-    except Exception as e:
-        print(f"Error updating vector database: {e}")
+    master_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
+    if os.path.exists(master_path):
+        # 1. Get current hash and load metadata
+        current_hash = get_file_hash(master_path)
+        metadata = helper.load_metadata()
         
-    print(f"Done! Pipeline finished and context rebuilt at {output_path}")
+        # 2. Compare hashes
+        if metadata.get("master_context_hash") == current_hash:
+            print("   -> [CACHE] No changes in master_context.txt.")
+            print("   -> [CACHE] Skipping OpenAI embeddings to save API costs.")
+        else:
+            print("   -> [UPDATE] Changes detected! Sending data to OpenAI...")
+            
+            # 3. Call the worker to do the heavy lifting
+            import utils.vector_processor as vector_p
+            vector_p.update_vector_db()
+            
+            # 4. Save the new hash for next time
+            metadata["master_context_hash"] = current_hash
+            helper.save_metadata(metadata)
+            print("   -> [SUCCESS] Vector database updated successfully.")
+    else:
+        print("   -> [ERROR] master_context.txt not found!")
+
+    print("\nDone! Pipeline finished.")
 
 if __name__ == "__main__":
     run_collector()

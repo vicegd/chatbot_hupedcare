@@ -3,6 +3,8 @@ import chromadb
 from chromadb.utils import embedding_functions
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import utils.helper as helper
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 def update_vector_db():
     config = helper.config
@@ -21,7 +23,7 @@ def update_vector_db():
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=config['embeddings']['max_chunk_size'],
         chunk_overlap=config['embeddings']['chunk_overlap'],
-        separators=["\n--- SOURCE: ", "\n[DB | ", "\n\n"]
+        separators=["\n--- SOURCE: ", "\n[DB | ", "\n\n", "\n", " ", ""]
     )
     chunks = text_splitter.split_text(full_text)
 

@@ -12,8 +12,7 @@ def sync_ftp_files(metadata, temp_folder):
     #Extensions we care about for the RAG system
     VALID_EXTENSIONS = (
         ".html", ".htm", ".php", ".txt", ".pdf", ".docx", 
-        ".doc",".jpg", ".jpeg", ".png", ".webp", ".mp4", 
-        ".webm", ".mov", ".mp3", ".wav", ".m4a", ".flac"
+        ".doc",".jpg", ".jpeg", ".png", ".mp3", ".wav", ".m4a", ".flac"
     )
 
     try:
