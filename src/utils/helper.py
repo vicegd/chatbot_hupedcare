@@ -11,11 +11,10 @@ import os
 import json
 import base64
 from openai import OpenAI
-from moviepy import VideoFileClip 
 
-#Initialization
+# Initialization
 def load_config():
-    with open("./config/config.yaml", "r") as f:
+    with open("../config/config.yaml", "r") as f:
         return yaml.safe_load(f)
     
 def load_metadata():
@@ -171,20 +170,20 @@ def extract_description_from_video_with_ai(video_path):
         return f"Error in Video Pipeline: {str(e)}"
 
 def extract_from_docx(file_path):
-    """Extrae texto de archivos .docx modernos."""
+    """Extract text from modern .docx files."""
     try:
         doc = Document(file_path)
         full_text = []
         for para in doc.paragraphs:
             full_text.append(para.text)
-        #Also tables
+        # Also extract text from tables
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
                     full_text.append(cell.text)
         return extract_clean_text("\n".join(full_text))
     except Exception as e:
-        print(f"Error procesando DOCX {file_path}: {e}")
+        print(f"Error processing DOCX {file_path}: {e}")
         return ""
 
 def extract_from_doc(file_path):

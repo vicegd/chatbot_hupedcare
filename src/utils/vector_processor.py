@@ -1,0 +1,43 @@
+import os
+import chromadb
+from chromadb.utils import embedding_functions
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+import utils.helper as helper
+
+def update_vector_db():
+    config = helper.config
+    # 1. Configuración de API (OpenAI Oficial)
+    openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+        api_key=os.getenv("MODEL_API_KEY"),
+        model_name=config['ai']['embedding_model']
+    )
+
+    # 2. Leer Master Context
+    master_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
+    with open(master_path, "r", encoding="utf-8") as f:
+        full_text = f.read()
+
+    # 3. Chunking AGRESIVO
+    # Subimos el tamaño a 1500 para que las descripciones de imágenes NO se corten
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=config['chunks']['max_chunk_size'],
+        chunk_overlap=config['chunks']['chunk_overlap'],
+        separators=["\n--- SOURCE: ", "\n[DB | ", "\n\n"]
+    )
+    chunks = text_splitter.split_text(full_text)
+
+    # 4. ChromaDB limpio
+    db_path = os.path.join(config['storage']['data_folder'], "vector_db")
+    client = chromadb.PersistentClient(path=db_path)
+    
+    if "rag_context" in [c.name for c in client.list_collections()]:
+        client.delete_collection(name="rag_context")
+    
+    collection = client.create_collection(name="rag_context", embedding_function=openai_ef)
+
+    # 5. Insertar
+    collection.add(
+        documents=chunks,
+        ids=[f"id_{i}" for i in range(len(chunks))]
+    )
+    print(f"Éxito: {len(chunks)} fragmentos indexados con OpenAI.")

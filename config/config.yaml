@@ -1,14 +1,22 @@
 # Configuración del Motor de IA
 ai:
-  base_url: "https://api.groq.com/openai/v1"
-  model: "llama-3.3-70b-versatile"
-  system_prompt: "Eres un asistente experto. Usa el contexto para responder. Responde en el idioma del usuario."
-  transcription_model: "whisper-large-v3"
-  vision_model: "meta-llama/llama-4-scout-17b-16e-instruct"
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"
+  system_prompt: "You are an expert assistant. Answer ONLY using the provided context.
+                Note: Context labeled 'SOURCE: images/...' contains visual descriptions
+                If the information is missing, state that you do not have that data
+                Always use the language of the user's question in your answer."
+  transcription_model: "whisper-1" 
+  vision_model: "gpt-4o-mini"
+  embedding_model: "text-embedding-3-small"
+
+chunks:
+  max_chunk_size: 1500
+  chunk_overlap: 200
   
 # Configuración del Sistema de Archivos
 storage:
-  data_folder: "DATA"
+  data_folder: "../DATA"
   refresh_interval_seconds: 3600
 
 # Configuración del Servidor

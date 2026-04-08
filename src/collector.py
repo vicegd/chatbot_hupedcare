@@ -3,6 +3,10 @@ from datetime import datetime
 import utils.helper as helper
 import utils.ftp_collector as ftp_c
 import utils.sql_collector as sql_c
+import utils.vector_processor as vector_p
+import os
+os.environ['TRANSFORMERS_OFFLINE'] = '1'
+os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 
 def run_collector():
     config = helper.config
@@ -16,7 +20,7 @@ def run_collector():
 
     #1. SYNC FTP FILES
     print("1. SYNCING FTP FILES...")
-    updated_files, metadata = ftp_c.sync_ftp_files(metadata, temp_folder)
+    #updated_files, metadata = ftp_c.sync_ftp_files(metadata, temp_folder)
 
     #2. PURGE ORPHANED CACHE
     print("2. PURGING ORPHANED CACHE FILES...")
@@ -100,10 +104,18 @@ def run_collector():
     output_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(master_lines))
-    
     helper.save_metadata(metadata)
-        
     print(f"Done! Context rebuilt at {output_path}")
+
+    #8. UPDATE VECTOR DATABASE
+    print("8. UPDATING VECTOR DATABASE (EMBEDDINGS)...")
+    try:
+        vector_p.update_vector_db()
+        print("Vector database updated successfully.")
+    except Exception as e:
+        print(f"Error updating vector database: {e}")
+        
+    print(f"Done! Pipeline finished and context rebuilt at {output_path}")
 
 if __name__ == "__main__":
     run_collector()
