@@ -18,7 +18,7 @@ embeddings:
   embedding_model: "text-embedding-3-small"
   top_k: 6
   temperature: 0.2
-  max_chunk_size: 1500
+  max_chunk_size: 1100
   chunk_overlap: 200
   
 # Configuración del Sistema de Archivos
@@ -28,8 +28,11 @@ storage:
 
 # Configuración del Servidor
 server:
-  host: "127.0.0.1"
-  port: 8000
+  public_url: "http://127.0.0.1:8000"
+  allowed_origins:
+    - "https://project.hupedcare.com"
+    - "https://hupedcare.com"
+  allow_origin_regex: "^(http://127\\.0\\.0\\.1(:[0-9]+)?|null)$"
 
 database:
   queries:

@@ -2,9 +2,11 @@ import os
 import chromadb
 from chromadb.utils import embedding_functions
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
+from urllib.parse import urlparse
 import utils.helper as helper
 
 # 1. INITIAL SETUP
@@ -30,6 +32,16 @@ collection = chroma_client.get_collection(
 
 # 4. SERVER AND AI CLIENT INITIALIZATION
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config['server'].get('allowed_origins', ["*"]),
+    allow_origin_regex=config['server'].get('allow_origin_regex'),
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # OpenAI Client (using gpt-4o-mini for high reasoning and low cost)
 client = OpenAI(api_key=os.getenv("MODEL_API_KEY"))
@@ -73,11 +85,24 @@ async def answer_user(item: Query):
     except Exception as e:
         return {"error": str(e)}
 
+
+def get_server_bind(config):
+    public_url = config['server'].get('public_url')
+    if public_url:
+        parsed = urlparse(public_url)
+        if parsed.hostname:
+            port = parsed.port
+            if port is None:
+                port = 443 if parsed.scheme == 'https' else 80
+            return parsed.hostname, port
+    return config['server']['host'], config['server']['port']
+
 # 7. EXECUTION ENTRY POINT
 if __name__ == "__main__":
     import uvicorn
+    host, port = get_server_bind(config)
     uvicorn.run(
-        app, 
-        host=config['server']['host'], 
-        port=config['server']['port']
+        app,
+        host=host,
+        port=port
     )
