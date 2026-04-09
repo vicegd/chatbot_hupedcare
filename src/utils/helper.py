@@ -13,8 +13,15 @@ import base64
 from openai import OpenAI
 
 # Initialization
+config_path = None
+project_root = None
+
 def load_config():
-    with open("../config/config.yaml", "r") as f:
+    global config_path, project_root
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(base_dir, '..', '..'))
+    config_path = os.path.join(project_root, 'config', 'config.yaml')
+    with open(config_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
     
 def load_metadata():
@@ -31,6 +38,7 @@ def save_metadata(metadata):
 
 load_dotenv()
 config = load_config()
+config['storage']['data_folder'] = os.path.join(project_root, 'DATA')
 metadata = load_metadata()
 client = OpenAI(base_url=config['ai']['base_url'], api_key=os.getenv("MODEL_API_KEY"))
 

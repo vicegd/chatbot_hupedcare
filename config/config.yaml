@@ -23,7 +23,7 @@ embeddings:
   
 # Configuración del Sistema de Archivos
 storage:
-  data_folder: "../DATA"
+  data_folder: "DATA"
   refresh_interval_seconds: 3600
 
 # Configuración del Servidor

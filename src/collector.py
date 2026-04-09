@@ -75,10 +75,10 @@ def run_collector():
                 except Exception as e:
                     print(f"Error processing {fname}: {e}")
 
-    # #4. ASSEMBLE MASTER CONTEXT
+    #4. ASSEMBLE MASTER CONTEXT
     print("4. ASSEMBLING MASTER CONTEXT...")
     unique_lines = set()
-    master_lines = [f"SYSTEM CONTEXT - UPDATED: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"]
+    master_lines = ["SYSTEM CONTEXT - RAG KNOWLEDGE BASE\n"]
     
     #5. ADD SQL DATA
     print("5. ADDING SQL DATA...")
@@ -93,7 +93,6 @@ def run_collector():
         with open(os.path.join(cache_folder, c_file), "r", encoding="utf-8") as f:
             for line in f:
                 clean = line.strip()
-                # Filtros: no vacío, no repetido, no mensajes de error
                 if clean and clean not in unique_lines and "No relevant content found." not in clean:
                     if not source_added:
                         master_lines.append(f"\n--- SOURCE: {source_label} ---")

@@ -25,7 +25,7 @@ db_path = os.path.join(config['storage']['data_folder'], "vector_db")
 chroma_client = chromadb.PersistentClient(path=db_path)
 
 # Retrieve the collection
-collection = chroma_client.get_collection(
+collection = chroma_client.get_or_create_collection(
     name="rag_context", 
     embedding_function=openai_ef
 )

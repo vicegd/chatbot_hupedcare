@@ -8,7 +8,7 @@ init(autoreset=True)
 
 def chat():
     config = load_config()
-    url = f"http://{config['server']['host']}:{config['server']['port']}/ask"
+    url = config['server']['public_url'] + "/ask"
     
     # Header
     print(Style.BRIGHT + Fore.CYAN + "="*50)
