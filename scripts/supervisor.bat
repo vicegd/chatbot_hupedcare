@@ -1,6 +1,6 @@
 @echo off
 echo ==================================================
-echo       HUPEDCARE SUPERVISOR - RAG ^& SERVER
+echo       HUPEDCARE SUPERVISOR - RAG & SERVER
 echo ==================================================
 
 :: Navigate to the script's folder, then UP one level to the project root

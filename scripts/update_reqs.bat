@@ -19,7 +19,7 @@ echo [1/2] Activating virtual environment...
 call .venv\Scripts\activate.bat
 
 echo [2/2] Scanning installed libraries and updating requirements.txt...
-pip freeze > requirements.txt
+pip list --format=freeze --not-required > requirements.txt
 
 echo.
 echo ==================================================

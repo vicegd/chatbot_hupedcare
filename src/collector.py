@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 import utils.helper as helper
 import utils.ftp_collector as ftp_c
 import utils.sql_collector as sql_c
