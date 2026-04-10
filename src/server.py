@@ -52,22 +52,35 @@ class Query(BaseModel):
 @app.post("/ask")
 async def answer_user(item: Query):
     try:
-        # 1. RETRIEVAL: Get chunks from ChromaDB
-        results = collection.query(
+        # 1. RETRIEVAL: Refresh connection just in case the collector recreated it
+        try:
+            # We fetch the collection dynamically on every single request
+            current_collection = chroma_client.get_collection(
+                name="rag_context", 
+                embedding_function=openai_ef
+            )
+        except Exception:
+            # If it fails, it means the collector is deleting/rebuilding the DB in this exact second
+            return {
+                "response": "I am currently updating my knowledge base. Please ask me again in about 10 seconds.", 
+                "status": "updating"
+            }
+
+        # We search inside the freshly retrieved collection
+        results = current_collection.query(
             query_texts=[item.question],
             n_results=config['embeddings']['top_k']
         )
         retrieved_context = "\n---\n".join(results['documents'][0])
         
-        # 2. CONSTRUCTION: Combine YAML prompt with actual data
-        # We use a clean f-string to separate identity from data
+        # 2. CONSTRUCTION: Combine YAML prompt with actual retrieved data
         full_system_message = (
             f"{config['ai']['system_prompt']}\n\n"
             f"### RETRIEVED CONTEXT ###\n"
             f"{retrieved_context}"
         )
 
-        # 3. GENERATION: Send to OpenAI
+        # 3. GENERATION: Send the combined data to OpenAI
         response = client.chat.completions.create(
             model=config['ai']['model'],
             messages=[
@@ -84,7 +97,6 @@ async def answer_user(item: Query):
         
     except Exception as e:
         return {"error": str(e)}
-
 
 def get_server_bind(config):
     public_url = config['server'].get('public_url')

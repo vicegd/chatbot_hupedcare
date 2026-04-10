@@ -1,7 +1,5 @@
 import mysql.connector
 import os
-from bs4 import BeautifulSoup
-import re
 import utils.helper as helper
 
 def collect_sql_data(config):

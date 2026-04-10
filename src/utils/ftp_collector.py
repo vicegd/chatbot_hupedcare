@@ -47,12 +47,16 @@ def sync_ftp_files(metadata, temp_folder):
                         if name.lower().endswith(VALID_EXTENSIONS):
                             remote_files_found.add(remote_full_path)
 
-                            #Check modification time from server
-                            #MDTM is standard for getting file last-modified date
-                            response = ftp.sendcmd(f"MDTM {remote_full_path}")
-                            remote_mtime = response[4:]
+                            # 'mlsd' already gives us the date in the 'modify' key (e.g., 20231025143000)
+                            remote_mtime = facts.get('modify')
 
-                            #Sync logic: Only download if it's new or timestamp changed
+                            # Security fallback: If the server is very old and doesn't send 'modify', 
+                            # then we fallback to the slow MDTM call.
+                            if not remote_mtime:
+                                response = ftp.sendcmd(f"MDTM {remote_full_path}")
+                                remote_mtime = response[4:]
+
+                            # Sync logic: Only download if it's new or timestamp changed
                             if metadata.get(remote_full_path) != remote_mtime:
                                 print(f"Update: {remote_full_path} -> Downloading...")
                                 
