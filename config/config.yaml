@@ -35,7 +35,6 @@ server:
 
 database:
   queries:
-    #Entradas y Páginas (El núcleo del conocimiento)
     #Filtramos solo lo que está publicado y evitamos revisiones, borradores o menús.
     - "SELECT post_title, post_content, post_type, post_date FROM wp_posts WHERE post_status = 'publish' AND post_type IN ('post', 'page')"
     #Comentarios Aprobados (El "Feedback" de la comunidad)
