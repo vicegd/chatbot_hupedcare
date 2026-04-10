@@ -36,7 +36,7 @@ This repository contains an advanced data ingestion system for RAG (Retrieval-Au
 ├── .env.example               # Template for environment variables
 ├── .gitignore                 # Git ignore rules
 ├── LICENSE                    # Project license
-└── requirements.txt           # Python dependencies
+└── requirements.txt           # Python dependencies 
 ```
 
 ## Installation & Setup
