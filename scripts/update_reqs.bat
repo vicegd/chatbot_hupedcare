@@ -1,6 +1,6 @@
 @echo off
 echo ==================================================
-echo      DEPENDENCY SAVER - HUPEDCARE
+echo      DEPENDENCY SAVER -- HUPEDCARE
 echo ==================================================
 echo.
 

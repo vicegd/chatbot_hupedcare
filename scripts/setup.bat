@@ -1,6 +1,6 @@
 @echo off
 echo ==================================================
-echo        ENVIRONMENT SETUP - HUPEDCARE
+echo        ENVIRONMENT SETUP -- HUPEDCARE
 echo ==================================================
 echo.
 
