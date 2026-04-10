@@ -23,7 +23,7 @@ This repository contains an advanced data ingestion system for RAG (Retrieval-Au
 │   ├── ftp_collector.py       # Remote sync module (FTP)
 │   ├── mysql_collector.py     # Database extraction module
 │   └── collector_helper.py    # File processors (PDF, Images, Video)
-├── paper/                     # Scientific Paper (LaTeX)
+├── docs/                     # Scientific Paper (LaTeX)
 │   ├── main.tex               # Main article document
 │   ├── references.bib         # Study bibliography
 │   └── /figures               # Diagrams and charts
