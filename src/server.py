@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import chromadb
 from chromadb.utils import embedding_functions
 from fastapi import FastAPI
@@ -10,9 +11,19 @@ from urllib.parse import urlparse
 import utils.helper as helper
 import utils.logger as logger
 
-logger = logger.setup_logger(logger_name="fastapi_server", log_filename="server.log")
+# 0. AUTONOMOUS ROOT DETECTION
+def get_project_root() -> Path:
+    """Finds the project root by looking for the 'config' folder."""
+    current_dir = Path(__file__).resolve().parent
+    for directory in [current_dir, current_dir.parent, current_dir.parent.parent]:
+        if (directory / "config").is_dir() or (directory / "requirements.txt").exists():
+            return directory
+    return current_dir.parent
+
+PROJECT_ROOT = get_project_root()
 
 # 1. INITIAL SETUP
+logger = logger.setup_logger(logger_name="fastapi_server", log_filename="server.log")
 load_dotenv()
 config = helper.config
 
@@ -23,8 +34,13 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
 )
 
 # 3. CHROMADB CONNECTION
-# Locate the persistent vector database folder defined in config
-db_path = os.path.join(config['storage']['data_folder'], "vector_db")
+# Force lowercase and build the absolute path using the local PROJECT_ROOT
+folder_name = config['storage'].get('data_folder', 'data').lower()
+db_path_obj = PROJECT_ROOT / folder_name / "vector_db"
+db_path = str(db_path_obj) # ChromaDB requires a string
+
+# Ensure the database folder exists before connecting
+os.makedirs(db_path, exist_ok=True)
 chroma_client = chromadb.PersistentClient(path=db_path)
 
 # Retrieve the collection
