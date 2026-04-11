@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 from urllib.parse import urlparse
 import utils.helper as helper
 
+# Initialize the logger for the server
+logger = helper.setup_logger(logger_name="fastapi_server", log_filename="server.log")
+
 # 1. INITIAL SETUP
 load_dotenv()
 config = helper.config
