@@ -137,7 +137,7 @@ def run_collector():
     else:
         logger.error("   -> [ERROR] master_context.txt not found!")
 
-    logger.info("\nDone! Pipeline finished.")
+    logger.info("Done! Pipeline finished.")
 
 if __name__ == "__main__":
     logger.info("Starting collector...")

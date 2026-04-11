@@ -20,6 +20,16 @@ embeddings:
   temperature: 0.2
   max_chunk_size: 1100
   chunk_overlap: 200
+
+logger:
+  log_folder: "LOGS"
+  log_console_level: "INFO"
+  log_file_level: "DEBUG"
+  log_console_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  log_file_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  log_rotation: "10 MB"
+  log_max_bytes: 5*1024*1024
+  log_backup_count: 3
   
 # Configuración del Sistema de Archivos
 storage:

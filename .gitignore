@@ -8,6 +8,7 @@ venv/
 # Carpetas de datos y temporales
 data/
 temp/
+logs/ 
 
 # Otros
 __pycache__/
