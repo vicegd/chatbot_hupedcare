@@ -3,6 +3,9 @@ import utils.helper as helper
 import utils.ftp_collector as ftp_c
 import utils.sql_collector as sql_c
 import hashlib
+import utils.logger as logger
+
+logger = logger.setup_logger(logger_name="data_collector", log_filename="collector.log")
 
 def get_file_hash(filepath):
     """Generates an MD5 hash of a file to detect if its content has changed."""
@@ -23,11 +26,11 @@ def run_collector():
     if not os.path.exists(cache_folder): os.makedirs(cache_folder)
 
     #1. SYNC FTP FILES
-    print("1. SYNCING FTP FILES...")
+    logger.info("1. SYNCING FTP FILES...")
     #updated_files, metadata = ftp_c.sync_ftp_files(metadata, temp_folder)
 
     #2. PURGE ORPHANED CACHE
-    print("2. PURGING ORPHANED CACHE FILES...")
+    logger.info("2. PURGING ORPHANED CACHE FILES...")
     current_temp_files = set()
     for root, _, files in os.walk(temp_folder):
         for fname in files:
@@ -36,11 +39,11 @@ def run_collector():
 
     for c_file in os.listdir(cache_folder):
         if c_file not in current_temp_files:
-            print(f"Cleanup: Removing {c_file} (no longer in server)")
+            logger.info(f"Cleanup: Removing {c_file} (no longer in server)")
             os.remove(os.path.join(cache_folder, c_file))
 
     #3. PROCESS FILES
-    print(f"3. PROCESSING UPDATES IN {temp_folder}...")
+    logger.info(f"3. PROCESSING UPDATES IN {temp_folder}...")
     for root, _, files in os.walk(temp_folder):
         for fname in files:
             f_path = os.path.join(root, fname)
@@ -48,7 +51,7 @@ def run_collector():
             c_path = os.path.join(cache_folder, rel_path.replace(os.sep, "_") + ".txt")
             
             if not os.path.exists(c_path) or os.path.getmtime(f_path) > os.path.getmtime(c_path):
-                print(f"  -> Processing: {rel_path}")
+                logger.info(f"  -> Processing: {rel_path}")
                 ext = f_path.lower()
                 desc = ""
                 
@@ -75,16 +78,16 @@ def run_collector():
                     print(f"Error processing {fname}: {e}")
 
     #4. ASSEMBLE MASTER CONTEXT
-    print("4. ASSEMBLING MASTER CONTEXT...")
+    logger.info("4. ASSEMBLING MASTER CONTEXT...")
     unique_lines = set()
     master_lines = ["SYSTEM CONTEXT - RAG KNOWLEDGE BASE\n"]
     
     #5. ADD SQL DATA
-    print("5. ADDING SQL DATA...")
+    logger.info("5. ADDING SQL DATA...")
     master_lines.append(sql_c.collect_sql_data(config))
 
     #6. ADD CACHED FILES WITH SOURCE HEADERS
-    print("6. ADDING CACHED FILES WITH SOURCE HEADERS...")
+    logger.info("6. ADDING CACHED FILES WITH SOURCE HEADERS...")
     for c_file in os.listdir(cache_folder):
         source_label = c_file.replace(".txt", "").replace("_", "/")
         source_added = False
@@ -101,15 +104,15 @@ def run_collector():
                     master_lines.append(clean)
 
     #7. SAVE EVERYTHING
-    print("7. SAVING MASTER CONTEXT...")
+    logger.info("7. SAVING MASTER CONTEXT...")
     output_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(master_lines))
     helper.save_metadata(metadata)
-    print(f"Done! Context rebuilt at {output_path}")
+    logger.info(f"Done! Context rebuilt at {output_path}")
 
     #8. UPDATE VECTOR DATABASE
-    print("8. UPDATING VECTOR DATABASE (EMBEDDINGS)...")
+    logger.info("8. UPDATING VECTOR DATABASE (EMBEDDINGS)...")
     master_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
     if os.path.exists(master_path):
         # 1. Get current hash and load metadata
@@ -118,10 +121,10 @@ def run_collector():
         
         # 2. Compare hashes
         if metadata.get("master_context_hash") == current_hash:
-            print("   -> [CACHE] No changes in master_context.txt.")
-            print("   -> [CACHE] Skipping OpenAI embeddings to save API costs.")
+            logger.info("   -> [CACHE] No changes in master_context.txt.")
+            logger.info("   -> [CACHE] Skipping OpenAI embeddings to save API costs.")
         else:
-            print("   -> [UPDATE] Changes detected! Sending data to OpenAI...")
+            logger.info("   -> [UPDATE] Changes detected! Sending data to OpenAI...")
             
             # 3. Call the worker to do the heavy lifting
             import utils.vector_processor as vector_p
@@ -130,11 +133,12 @@ def run_collector():
             # 4. Save the new hash for next time
             metadata["master_context_hash"] = current_hash
             helper.save_metadata(metadata)
-            print("   -> [SUCCESS] Vector database updated successfully.")
+            logger.info("   -> [SUCCESS] Vector database updated successfully.")
     else:
-        print("   -> [ERROR] master_context.txt not found!")
+        logger.error("   -> [ERROR] master_context.txt not found!")
 
-    print("\nDone! Pipeline finished.")
+    logger.info("\nDone! Pipeline finished.")
 
 if __name__ == "__main__":
+    logger.info("Starting collector...")
     run_collector()

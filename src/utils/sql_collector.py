@@ -1,6 +1,9 @@
 import mysql.connector
 import os
 import utils.helper as helper
+import utils.logger as logger
+
+logger = logger.setup_logger(logger_name="sql_collector", log_filename="sql_collector.log")
 
 def collect_sql_data(config):
     text_output = "--- DATABASE EXPORT ---\n"
@@ -80,4 +83,5 @@ def collect_sql_data(config):
         return text_output
         
     except Exception as e:
+        logger.error(f"MySQL Error: {e}")
         return f"MySQL Error: {e}"

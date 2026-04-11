@@ -2,6 +2,9 @@ import requests
 import sys
 from colorama import Fore, Style, init
 from utils.helper import load_config
+import utils.logger as logger
+
+logger = logger.setup_logger(logger_name="api_client", log_filename="client.log")
 
 # Initialize colorama (autoreset=True makes colors only apply to the current print)
 init(autoreset=True)
@@ -47,11 +50,14 @@ def chat():
                 print(Fore.RED + f"Server Error: {response.status_code}")
 
         except KeyboardInterrupt:
+            logger.error("Session interrupted by user.")
             print(Fore.YELLOW + "\n\nSession interrupted by user.")
             break
         except Exception as e:
+            logger.error(f"Connection error: {e}")
             print(Fore.RED + f"\nConnection error: {e}")
             break
 
 if __name__ == "__main__":
+    logger.info("Starting API client...")
     chat()

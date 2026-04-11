@@ -5,6 +5,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import utils.helper as helper
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
+import utils.logger as logger
+
+logger = logger.setup_logger(logger_name="vector_processor", log_filename="vector_processor.log")
 
 def update_vector_db():
     config = helper.config
@@ -41,4 +44,4 @@ def update_vector_db():
         documents=chunks,
         ids=[f"id_{i}" for i in range(len(chunks))]
     )
-    print(f"Success: {len(chunks)} fragments indexed with OpenAI.")
+    logger.info(f"Success: {len(chunks)} fragments indexed with OpenAI.")

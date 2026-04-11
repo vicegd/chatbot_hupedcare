@@ -4,9 +4,7 @@ from bs4 import BeautifulSoup
 import PyPDF2
 from docx import Document
 from openai import OpenAI
-import subprocess
 from docx import Document
-import subprocess
 import os
 import json
 import base64

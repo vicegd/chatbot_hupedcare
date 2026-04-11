@@ -8,9 +8,9 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 import utils.helper as helper
+import utils.logger as logger
 
-# Initialize the logger for the server
-logger = helper.setup_logger(logger_name="fastapi_server", log_filename="server.log")
+logger = logger.setup_logger(logger_name="fastapi_server", log_filename="server.log")
 
 # 1. INITIAL SETUP
 load_dotenv()
@@ -99,6 +99,7 @@ async def answer_user(item: Query):
         }
         
     except Exception as e:
+        logger.error(f"Error processing question '{item.question}': {e}")
         return {"error": str(e)}
 
 def get_server_bind(config):
@@ -114,6 +115,7 @@ def get_server_bind(config):
 
 # 7. EXECUTION ENTRY POINT
 if __name__ == "__main__":
+    logger.info("Starting FastAPI server...")
     import uvicorn
     host, port = get_server_bind(config)
     uvicorn.run(

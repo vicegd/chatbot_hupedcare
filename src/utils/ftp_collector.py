@@ -1,5 +1,8 @@
 import os
 from ftplib import FTP
+import utils.logger as logger
+
+logger = logger.setup_logger(logger_name="ftp_collector", log_filename="ftp_collector.log")
 
 def sync_ftp_files(metadata, temp_folder):
     """
@@ -17,7 +20,7 @@ def sync_ftp_files(metadata, temp_folder):
 
     try:
         host = os.getenv("FTP_HOST")
-        print(f"Connecting to FTP: {host}")
+        logger.info(f"Connecting to FTP: {host}")
         
         ftp = FTP(host)
         ftp.login(user=os.getenv("FTP_USER"), passwd=os.getenv("FTP_PASSWORD"))
@@ -58,7 +61,7 @@ def sync_ftp_files(metadata, temp_folder):
 
                             # Sync logic: Only download if it's new or timestamp changed
                             if metadata.get(remote_full_path) != remote_mtime:
-                                print(f"Update: {remote_full_path} -> Downloading...")
+                                logger.info(f"Update: {remote_full_path} -> Downloading...")
                                 
                                 with open(local_full_path, "wb") as f:
                                     ftp.retrbinary(f"RETR {remote_full_path}", f.write)
@@ -67,7 +70,7 @@ def sync_ftp_files(metadata, temp_folder):
                                 updated_files.append(local_full_path)
 
             except Exception as e:
-                print(f"Error while walking {remote_path}: {e}")
+                logger.error(f"Error while walking {remote_path}: {e}")
 
         # Start the recursive sync
         walk_recursive(remote_root, temp_folder)
@@ -76,7 +79,7 @@ def sync_ftp_files(metadata, temp_folder):
         stored_paths = list(metadata.keys())
         for path_in_meta in stored_paths:
             if path_in_meta not in remote_files_found:
-                print(f"Was first deleted on server: {path_in_meta} -> Cleaning local copy...")
+                logger.info(f"Was first deleted on server: {path_in_meta} -> Cleaning local copy...")
                 
                 rel_path = os.path.relpath(path_in_meta, remote_root)
                 local_to_delete = os.path.join(temp_folder, rel_path)
@@ -85,14 +88,14 @@ def sync_ftp_files(metadata, temp_folder):
                     try:
                         os.remove(local_to_delete)
                     except Exception as e:
-                        print(f"Error deleting {local_to_delete}: {e}")
+                        logger.error(f"Error deleting {local_to_delete}: {e}")
 
                 del metadata[path_in_meta]
 
         ftp.quit()
-        print("FTP Sync completed successfully.")
+        logger.info("FTP Sync completed successfully.")
         return updated_files, metadata
 
     except Exception as e:
-        print(f"FTP Fatal Error: {e}")
+        logger.error(f"FTP Fatal Error: {e}")
         return [], metadata
