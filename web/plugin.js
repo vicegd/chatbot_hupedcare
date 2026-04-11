@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
             input.value = '';
 
             // Enviar al servidor
-            fetch('http://127.0.0.1:8000/ask', {
+            fetch('http://156.35.98.76:8000/ask', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
