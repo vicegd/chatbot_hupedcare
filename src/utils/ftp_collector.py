@@ -6,13 +6,22 @@ logger = logger.setup_logger(logger_name="ftp_collector", log_filename="ftp_coll
 
 def sync_ftp_files(metadata, temp_folder):
     """
-    Synchronizes local TEMP_DOWNLOADS with the remote FTP server.
-    Returns a list of updated files and the modified metadata.
+    Synchronize the local temporary mirror with the remote FTP tree.
+
+    Args:
+        metadata: Dictionary that tracks the latest known remote modification
+            timestamp for each synchronized file.
+        temp_folder: Local folder where remote files are mirrored.
+
+    Returns:
+        A tuple `(updated_files, metadata)` where `updated_files` contains the
+        local file paths downloaded during the current run and `metadata`
+        contains the refreshed timestamp mapping.
     """
     updated_files = []
     remote_files_found = set()
     
-    #Extensions we care about for the RAG system
+    # Only mirror the file types that have downstream extractors in the RAG pipeline.
     VALID_EXTENSIONS = (
         ".html", ".htm", ".php", ".txt", ".pdf", ".docx", 
         ".doc",".jpg", ".jpeg", ".png", ".mp3", ".wav", ".m4a", ".flac"
@@ -36,7 +45,7 @@ def sync_ftp_files(metadata, temp_folder):
                 os.makedirs(local_path)
 
             try:
-                #mlsd is more reliable for metadata than nlstd
+                # MLSD provides directory entries plus metadata in one round-trip.
                 for name, facts in ftp.mlsd(path=remote_path):
                     if name in (".", ".."): 
                         continue
@@ -45,7 +54,7 @@ def sync_ftp_files(metadata, temp_folder):
                     local_full_path = os.path.join(local_path, name)
 
                     if facts['type'] == 'dir':
-                        #It's a folder, go deeper
+                        # Recurse into child directories to mirror the full remote tree.
                         logger.debug(f"Descending into FTP directory: {remote_full_path}")
                         walk_recursive(remote_full_path, local_full_path)
                     
@@ -54,16 +63,15 @@ def sync_ftp_files(metadata, temp_folder):
                             remote_files_found.add(remote_full_path)
                             logger.debug(f"Eligible remote file found: {remote_full_path}")
 
-                            # 'mlsd' already gives us the date in the 'modify' key (e.g., 20231025143000)
+                            # MLSD exposes the server modification timestamp in the 'modify' field.
                             remote_mtime = facts.get('modify')
 
-                            # Security fallback: If the server is very old and doesn't send 'modify', 
-                            # then we fallback to the slow MDTM call.
+                            # Fallback to MDTM for older FTP servers that do not expose MLSD metadata.
                             if not remote_mtime:
                                 response = ftp.sendcmd(f"MDTM {remote_full_path}")
                                 remote_mtime = response[4:]
 
-                            # Sync logic: Only download if it's new or timestamp changed
+                            # Download only when the remote timestamp differs from the tracked metadata.
                             if metadata.get(remote_full_path) != remote_mtime:
                                 logger.info(f"Update: {remote_full_path} -> Downloading...")
                                 
@@ -78,10 +86,10 @@ def sync_ftp_files(metadata, temp_folder):
             except Exception as e:
                 logger.exception(f"Error while walking {remote_path}: {e}")
 
-        # Start the recursive sync
+        # Mirror the remote subtree under the configured local temp folder.
         walk_recursive(remote_root, temp_folder)
 
-        #PURGE local files that no longer exist on the server and clean metadata
+        # Remove local files that disappeared upstream and clear their metadata entries.
         stored_paths = list(metadata.keys())
         logger.debug(f"Metadata entries tracked before cleanup: {len(stored_paths)}")
         for path_in_meta in stored_paths:
@@ -100,10 +108,10 @@ def sync_ftp_files(metadata, temp_folder):
                 del metadata[path_in_meta]
 
         ftp.quit()
-            logger.debug(f"FTP sync downloaded {len(updated_files)} updated files")
+        logger.debug(f"FTP sync downloaded {len(updated_files)} updated files")
         logger.info("FTP Sync completed successfully.")
         return updated_files, metadata
 
     except Exception as e:
-            logger.exception(f"FTP fatal error: {e}")
+        logger.exception(f"FTP fatal error: {e}")
         return [], metadata

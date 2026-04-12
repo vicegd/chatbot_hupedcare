@@ -6,7 +6,11 @@ from pathlib import Path
 
 def get_project_root() -> Path:
     """
-    Find the project root by walking upward until 'config' or 'requirements.txt' is found.
+    Find the repository root used to resolve configuration and log paths.
+
+    Returns:
+        A `Path` pointing to the first parent directory that contains either
+        `config/` or `requirements.txt`.
     """
     # Start from the directory that contains this file.
     current_dir = Path(__file__).resolve().parent
@@ -22,7 +26,15 @@ def get_project_root() -> Path:
 
 def setup_logger(logger_name: str, log_filename: str) -> logging.Logger:
     """
-    Create a project logger with automatic configuration and root detection.
+    Create or reuse a configured logger for the project.
+
+    Args:
+        logger_name: Logical logger name used by the Python logging subsystem.
+        log_filename: Name of the log file written inside the configured log
+            directory.
+
+    Returns:
+        A logger instance configured with rotating file and console handlers.
     """
     
     # 1. Resolve the actual project root.
@@ -40,6 +52,7 @@ def setup_logger(logger_name: str, log_filename: str) -> logging.Logger:
         log_cfg = {}
 
     # 3. Extract configuration with safe defaults.
+    # These defaults keep logging operational even if config.yaml is incomplete.
     log_folder = log_cfg.get("log_folder", "LOGS")
     console_level_name = log_cfg.get("log_console_level", "INFO")
     file_level_name = log_cfg.get("log_file_level", "DEBUG")
@@ -76,6 +89,7 @@ def setup_logger(logger_name: str, log_filename: str) -> logging.Logger:
 
     # Avoid duplicate handlers if setup_logger is called multiple times.
     if not logger.handlers:
+        # Split formatter setup from handler setup so console and file output can diverge cleanly.
         file_formatter = logging.Formatter(file_format)
         console_formatter = logging.Formatter(console_format)
 

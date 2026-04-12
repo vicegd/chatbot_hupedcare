@@ -8,7 +8,15 @@ import utils.sql_collector as sql_collector
 logger = logger.setup_logger(logger_name="data_collector", log_filename="collector.log")
 
 def get_file_hash(filepath):
-    """Generates an MD5 hash of a file to detect if its content has changed."""
+    """Return an MD5 hash for the file stored at the given path.
+
+    Args:
+        filepath: Absolute or relative path to the file whose contents should
+            be hashed.
+
+    Returns:
+        The hexadecimal MD5 digest of the file contents.
+    """
     hasher = hashlib.md5()
     with open(filepath, 'rb') as file_handle:
         file_bytes = file_handle.read()
@@ -16,6 +24,14 @@ def get_file_hash(filepath):
     return hasher.hexdigest()
 
 def run_collector():
+    """Execute the end-to-end ingestion and indexing pipeline.
+
+    The collector prepares local working folders, processes downloaded source
+    files into cached text, appends SQL content, assembles the final
+    `master_context.txt`, and refreshes the vector database only when the
+    resulting context changed.
+    """
+    # Reuse the shared configuration and persisted metadata assembled by helper.py.
     config = helper.config
     metadata = helper.metadata
 
@@ -25,6 +41,7 @@ def run_collector():
     logger.debug(f"Temporary downloads directory: {temp_downloads_dir}")
     logger.debug(f"Cache text directory: {cache_text_dir}")
     
+    # Ensure the working directories exist before starting the pipeline.
     if not os.path.exists(temp_downloads_dir): os.makedirs(temp_downloads_dir)
     if not os.path.exists(cache_text_dir): os.makedirs(cache_text_dir)
 
@@ -37,6 +54,7 @@ def run_collector():
     expected_cache_files = set()
     for root, _, files in os.walk(temp_downloads_dir):
         for file_name in files:
+            # Cache filenames flatten the relative path so each source has a stable text mirror.
             relative_path = os.path.relpath(os.path.join(root, file_name), temp_downloads_dir)
             expected_cache_files.add(relative_path.replace(os.sep, "_") + ".txt")
     logger.debug(f"Expected cache file count: {len(expected_cache_files)}")
@@ -61,6 +79,7 @@ def run_collector():
                 logger.debug(f"Detected source file for processing: {file_path}")
                 
                 try:
+                    # Pick the extraction strategy based on the file extension.
                     if normalized_path.endswith(('.html', '.htm', '.php')):
                         extracted_text = helper.extract_from_html_or_php(file_path)
                     elif normalized_path.endswith(('.jpg', '.png', '.jpeg', '.webp')):
@@ -78,6 +97,7 @@ def run_collector():
                             extracted_text = helper.extract_clean_text(file_handle.read())
                     logger.debug(f"Extracted {len(extracted_text)} characters from {relative_path}")
                
+                    # Persist the processed text even when the extractor returns an empty payload.
                     with open(cache_file_path, "w", encoding="utf-8") as file_handle:
                         file_handle.write(extracted_text if extracted_text.strip() else "No relevant content found.")
                 except Exception as e:
@@ -103,8 +123,10 @@ def run_collector():
         with open(os.path.join(cache_text_dir, cache_file_name), "r", encoding="utf-8") as file_handle:
             for line in file_handle:
                 clean_line = line.strip()
+                # De-duplicate at line level so repeated snippets do not waste embedding budget.
                 if clean_line and clean_line not in unique_lines and "No relevant content found." not in clean_line:
                     if not source_added:
+                        # Add a header once per file so the LLM can cite the origin.
                         master_lines.append(f"\n--- SOURCE: {source_label} ---")
                         source_added = True
                     
@@ -142,6 +164,7 @@ def run_collector():
             vector_processor.update_vector_db()
             
             # 4. Save the new hash for next time
+            # The stored hash avoids rebuilding embeddings when the assembled context is unchanged.
             metadata["master_context_hash"] = current_hash
             helper.save_metadata(metadata)
             logger.debug("Stored new master context hash in metadata")

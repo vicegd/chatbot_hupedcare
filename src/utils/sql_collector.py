@@ -6,6 +6,16 @@ import utils.logger as logger
 logger = logger.setup_logger(logger_name="sql_collector", log_filename="sql_collector.log")
 
 def collect_sql_data(config):
+    """Collect and normalize SQL data for inclusion in the master context.
+
+    Args:
+        config: Application configuration dictionary containing the SQL queries
+            to execute.
+
+    Returns:
+        A formatted text block ready to be appended to `master_context.txt`.
+        If collection fails, a short error string is returned instead.
+    """
     text_output = "--- DATABASE EXPORT ---\n"
     try:
         logger.debug("Opening MySQL connection for SQL collection")
@@ -26,6 +36,7 @@ def collect_sql_data(config):
             return "No queries configured in config.yaml"
         
         for query in queries:
+            # The SQL list is intentionally config-driven so data sources can be extended without code changes.
             logger.debug(f"Executing SQL query: {query}")
             cursor.execute(query)
             rows = cursor.fetchall()
@@ -69,7 +80,7 @@ def collect_sql_data(config):
                 from bs4 import BeautifulSoup
                 import re
                 
-                # Remove WordPress Gutenberg comment blocks.
+                # Remove WordPress editor comments before turning the content into plain text.
                 clean_content = re.sub(r'', '', content, flags=re.DOTALL)
                 
                 # Parse and strip HTML tags.

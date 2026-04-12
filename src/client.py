@@ -9,10 +9,18 @@ logger = logger.setup_logger(logger_name="api_client", log_filename="client.log"
 init(autoreset=True)
 
 def chat():
+    """Run the interactive command-line client for the chatbot API.
+
+    The client reloads the current server configuration, prints a small banner
+    through the logging system, and then enters a request-response loop until
+    the user submits an exit command or interrupts the session.
+    """
+    # Reload the config at startup so the CLI always uses the latest server URL.
     config = load_config()
     url = config['server']['public_url'] + "/ask"
     logger.debug(f"Client configured to use endpoint: {url}")
     
+    # Route the CLI banner through the logger so all console output follows the same path.
     logger.info(Style.BRIGHT + Fore.CYAN + "=" * 50)
     logger.info(Style.BRIGHT + Fore.CYAN + "       HUPEDCARE CHATBOT - RESEARCH ASSISTANT")
     logger.info(Style.BRIGHT + Fore.CYAN + "=" * 50)
@@ -25,6 +33,7 @@ def chat():
             question = input(Style.BRIGHT + Fore.GREEN + ">> ")
             logger.debug(f"Received user input with length {len(question.strip())}")
 
+            # Preserve the multilingual exit aliases already used by the CLI.
             if question.lower() in ["salir", "exit", "wyjść", "sair", "çıkmak", "quit"]:
                 logger.info(Fore.YELLOW + "Closing session... Goodbye!")
                 break
@@ -40,6 +49,7 @@ def chat():
             logger.debug(f"Received HTTP status {response.status_code} from backend")
 
             if response.status_code == 200:
+                # The API contract returns the generated answer under the 'response' key.
                 answer = response.json()['response']
                 logger.debug(f"Received answer with length {len(answer)}")
                 # 3. AI RESPONSE (blue/cyan color for the assistant)

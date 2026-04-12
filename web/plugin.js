@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.body.appendChild(toggleButton);
 
+    // Build the full widget markup at runtime so it can be dropped into any page with one script tag.
     const chatWindow = document.createElement('div');
     chatWindow.id = 'chatbot-window';
     chatWindow.innerHTML = `
@@ -90,6 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const sendButton = document.getElementById('chatbot-send');
 
     toggleButton.addEventListener('click', function() {
+        // Reuse CSS animations both when opening and closing the floating window.
         if (chatWindow.style.display === 'flex') {
             chatWindow.style.animation = 'slideDown 0.3s ease-in';
             setTimeout(() => {
@@ -106,6 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
         element.innerHTML = '';
         function type() {
             if (i < text.length) {
+                // Append one character per tick to simulate streaming output.
                 element.innerHTML += text.charAt(i);
                 i++;
                 messagesContainer.scrollTop = messagesContainer.scrollHeight; // Keep the latest message visible.
@@ -122,6 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const msg = document.createElement('div');
         msg.className = 'message ' + sender;
         if (isTyping) {
+            // A dedicated typing node makes it easy to replace or remove later.
             msg.innerHTML = '<span class="typing">' + translations[currentLanguage].typing + '</span>';
             msg.id = 'typing-indicator';
         } else {
@@ -138,6 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function sendMessage() {
         const question = messageInput.value.trim();
         if (question) {
+            // Echo the user message immediately so the UI feels responsive before the network round-trip.
             addMessage(question, 'user');
             messageInput.value = '';
 
@@ -151,6 +156,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(data => {
+                // The backend may return either a generated answer or a serialized error payload.
                 if (data.response) {
                     addMessage(data.response, 'bot');
                 } else if (data.error) {

@@ -10,6 +10,12 @@ import utils.logger as logger
 logger = logger.setup_logger(logger_name="vector_processor", log_filename="vector_processor.log")
 
 def update_vector_db():
+    """Rebuild the ChromaDB collection from the current master context.
+
+    The function reads the assembled context file, splits it into semantic
+    chunks, recreates the `rag_context` collection, and uploads the new
+    documents so retrieval stays aligned with the latest ingested data.
+    """
     config = helper.config
     # 1. API configuration.
     logger.debug(f"Embedding model configured as {config['embeddings']['embedding_model']}")
@@ -26,6 +32,7 @@ def update_vector_db():
     logger.debug(f"Master context size: {len(full_text)} characters")
 
     # 3. Chunking
+    # Keep source headers as preferred separators so related fragments stay grouped when possible.
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=config['embeddings']['max_chunk_size'],
         chunk_overlap=config['embeddings']['chunk_overlap'],
@@ -43,6 +50,7 @@ def update_vector_db():
         logger.debug("Existing rag_context collection found and will be replaced")
         chroma_client.delete_collection(name="rag_context")
     
+    # Rebuild the collection from scratch so the embedding store always mirrors the latest master context.
     collection = chroma_client.create_collection(name="rag_context", embedding_function=openai_ef)
 
     # 5. Insert chunks into the collection.

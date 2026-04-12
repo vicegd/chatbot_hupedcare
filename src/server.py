@@ -13,8 +13,14 @@ import utils.logger as logger
 
 # 0. AUTONOMOUS ROOT DETECTION
 def get_project_root() -> Path:
-    """Finds the project root by looking for the 'config' folder."""
+    """Return the project root directory used by the API server.
+
+    The lookup walks upward from the current file until it finds a directory
+    that looks like the repository root, identified by `config/` or
+    `requirements.txt`.
+    """
     current_dir = Path(__file__).resolve().parent
+    # Walk a few levels upward so the server can be launched from different working directories.
     for directory in [current_dir, current_dir.parent, current_dir.parent.parent]:
         if (directory / "config").is_dir() or (directory / "requirements.txt").exists():
             return directory
@@ -45,7 +51,7 @@ logger.debug(f"ChromaDB path resolved to {db_path}")
 os.makedirs(db_path, exist_ok=True)
 chroma_client = chromadb.PersistentClient(path=db_path)
 
-# Retrieve the collection
+# Pre-create the collection at startup so the API fails early if embeddings are misconfigured.
 collection = chroma_client.get_or_create_collection(
     name="rag_context", 
     embedding_function=openai_ef
@@ -72,6 +78,15 @@ class Query(BaseModel):
 
 @app.post("/ask")
 async def answer_user(item: Query):
+    """Answer a user question using retrieval-augmented generation.
+
+    Args:
+        item: Request payload containing the end-user question.
+
+    Returns:
+        A JSON-serializable dictionary with the generated answer and a status
+        flag, or an error payload if the request cannot be processed.
+    """
     try:
         logger.debug(f"Received question with length {len(item.question)}")
         # 1. RETRIEVAL: Refresh connection just in case the collector recreated it
@@ -94,6 +109,7 @@ async def answer_user(item: Query):
             n_results=config['embeddings']['top_k']
         )
         logger.debug(f"Retrieved {len(results['documents'][0]) if results.get('documents') else 0} context chunks")
+        # Join the retrieved chunks into one prompt section for the final completion call.
         retrieved_context = "\n---\n".join(results['documents'][0])
         
         # 2. CONSTRUCTION: Combine YAML prompt with actual retrieved data
@@ -124,6 +140,16 @@ async def answer_user(item: Query):
         return {"error": str(e)}
 
 def get_server_bind(config):
+    """Resolve the host and port the FastAPI server should bind to.
+
+    Args:
+        config: Application configuration dictionary loaded from YAML.
+
+    Returns:
+        A `(host, port)` tuple derived from `public_url` when present, or from
+        the explicit server host/port settings otherwise.
+    """
+    # Prefer the externally visible URL when available so local startup matches deployment routing.
     public_url = config['server'].get('public_url')
     if public_url:
         parsed = urlparse(public_url)
