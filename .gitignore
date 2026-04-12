@@ -13,6 +13,15 @@ temp/
 logs/
 *.log
 
+# LaTeX build artifacts
+docs/*.aux
+docs/*.bbl
+docs/*.blg
+docs/*.fdb_latexmk
+docs/*.fls
+docs/*.out
+docs/*.synctex.gz
+
 # Python cache and artifacts
 __pycache__/
 *.py[cod]
