@@ -1,5 +1,6 @@
 import os
 from ftplib import FTP
+
 import utils.logger as logger
 
 logger = logger.setup_logger(logger_name="ftp_collector", log_filename="ftp_collector.log")

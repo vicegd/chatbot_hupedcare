@@ -2,12 +2,14 @@ import base64
 import json
 import os
 import re
+
+import PyPDF2
 import yaml
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
-import PyPDF2
 from docx import Document
+from dotenv import load_dotenv
 from openai import OpenAI
+
 import utils.logger as logger
 
 logger = logger.setup_logger(logger_name="helper", log_filename="helper.log")

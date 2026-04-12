@@ -124,6 +124,14 @@ python src/collector.py
 python src/server.py
 ```
 
+### Health check endpoint
+
+Once the server is running, you can verify service availability with:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
 ### Run the CLI client
 
 ```bash
@@ -133,6 +141,29 @@ python src/client.py
 ### Use helper scripts
 
 The `scripts/` directory contains Windows and shell helpers for setup, supervision, and dependency refresh.
+
+## Development and CI
+
+This repository includes:
+
+- GitHub Actions workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml)
+- Ruff lint configuration: [pyproject.toml](pyproject.toml)
+- Smoke tests: [tests](tests)
+
+Install development dependencies:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Run local quality checks before pushing:
+
+```bash
+ruff check src tests
+pytest -q
+```
+
+For contribution guidelines and pull-request expectations, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Deployment Guide
 

@@ -1,5 +1,7 @@
-import mysql.connector
 import os
+
+import mysql.connector
+
 import utils.helper as helper
 import utils.logger as logger
 
@@ -77,8 +79,9 @@ def collect_sql_data(config):
                 else:
                     continue  # Ignore unexpected query output.
 
-                from bs4 import BeautifulSoup
                 import re
+
+                from bs4 import BeautifulSoup
                 
                 # Remove WordPress editor comments before turning the content into plain text.
                 clean_content = re.sub(r'', '', content, flags=re.DOTALL)

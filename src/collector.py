@@ -1,6 +1,6 @@
 import hashlib
 import os
-import utils.ftp_collector as ftp_collector
+
 import utils.helper as helper
 import utils.logger as logger
 import utils.sql_collector as sql_collector
@@ -47,6 +47,8 @@ def run_collector():
 
     # 1. SYNC FTP FILES
     logger.info("1. SYNCING FTP FILES...")
+    # FTP sync can be enabled when remote mirroring is required.
+    # import utils.ftp_collector as ftp_collector
     # updated_files, metadata = ftp_collector.sync_ftp_files(metadata, temp_downloads_dir)
 
     # 2. PURGE ORPHANED CACHE

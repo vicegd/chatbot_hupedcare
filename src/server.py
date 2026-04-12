@@ -1,15 +1,18 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
+
 import chromadb
 from chromadb.utils import embedding_functions
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from openai import OpenAI
-from dotenv import load_dotenv
-from urllib.parse import urlparse
+from pydantic import BaseModel
+
 import utils.helper as helper
 import utils.logger as logger
+
 
 # 0. AUTONOMOUS ROOT DETECTION
 def get_project_root() -> Path:
@@ -34,9 +37,17 @@ load_dotenv()
 config = helper.config
 logger.debug(f"Server project root resolved to {PROJECT_ROOT}")
 
+# Validate critical environment settings early so startup errors are explicit.
+model_api_key = os.getenv("MODEL_API_KEY")
+if not model_api_key:
+    raise RuntimeError(
+        "MODEL_API_KEY is required to start the API server. "
+        "Define it in your environment or .env file."
+    )
+
 # 2. EMBEDDING CONFIGURATION 
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-    api_key=os.getenv("MODEL_API_KEY"),
+    api_key=model_api_key,
     model_name=config['embeddings']['embedding_model']
 )
 
@@ -71,10 +82,15 @@ app.add_middleware(
 )
 
 # OpenAI Client (using gpt-4o-mini for high reasoning and low cost)
-client = OpenAI(api_key=os.getenv("MODEL_API_KEY"))
+client = OpenAI(api_key=model_api_key)
 
 class Query(BaseModel):
     question: str
+
+@app.get("/health")
+async def health_check():
+    """Return lightweight service status for monitoring probes."""
+    return {"status": "ok"}
 
 @app.post("/ask")
 async def answer_user(item: Query):

@@ -1,9 +1,12 @@
 import os
+import warnings
+
 import chromadb
 from chromadb.utils import embedding_functions
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 import utils.helper as helper
-import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 import utils.logger as logger
 

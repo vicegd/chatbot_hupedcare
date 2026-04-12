@@ -1,7 +1,8 @@
 import requests
 from colorama import Fore, Style, init
-from utils.helper import load_config
+
 import utils.logger as logger
+from utils.helper import load_config
 
 logger = logger.setup_logger(logger_name="api_client", log_filename="client.log")
 

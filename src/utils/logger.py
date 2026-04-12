@@ -1,8 +1,10 @@
 import logging
-from logging.handlers import RotatingFileHandler
 import os
-import yaml
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+import yaml
+
 
 def get_project_root() -> Path:
     """
