@@ -2,6 +2,13 @@
 
 This repository contains the current backend, ingestion pipeline, and web widget for the HUPEDCARE chatbot. The project follows a Retrieval-Augmented Generation (RAG) architecture: source content is collected and normalized into a master context, embedded into a vector database, and then queried by a FastAPI service that answers end-user questions.
 
+## About HUPEDCARE
+
+This software is part of the HUPEDCARE initiative and is intended to support its digital assistant and knowledge services.
+
+- Main website: https://hupedcare.com
+- Project platform: https://project.hupedcare.com
+
 ## Architecture
 
 The system is split into four runtime areas:

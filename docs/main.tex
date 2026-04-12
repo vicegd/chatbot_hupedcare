@@ -1,1 +1,354 @@
-/section{Information about the project}
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{float}
+
+\geometry{margin=2.5cm}
+\setstretch{1.1}
+
+\newcommand{\placeholderfigure}[4][0.9\linewidth]{
+\begin{figure}[H]
+	\centering
+	\IfFileExists{#2}{
+		\includegraphics[width=#1]{#2}
+	}{
+		\fbox{\parbox[c][0.25\textheight][c]{0.88\linewidth}{\centering #3\\[6pt]Image file not found: #2}}
+	}
+	\caption{#3}
+	\label{#4}
+\end{figure}
+}
+
+\title{Multimodal Incremental RAG for Domain-Specific Assistants\\
+Design, Cost-Aware Updating, and Empirical Evaluation}
+\author{HUPEDCARE Project Team}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This manuscript presents a scientific framing for the HUPEDCARE chatbot system, a Retrieval-Augmented Generation (RAG) architecture that combines heterogeneous data ingestion (FTP files, SQL records, text documents, images, and audio), incremental context rebuilding, and vector retrieval for grounded question answering. The paper is structured using an IMRaD-style organization and includes a reproducible experimental protocol focused on quality, latency, and cost.
+\end{abstract}
+
+\section{Introduction}
+
+Domain-specific assistants require factual consistency, source grounding, and operational efficiency. In practical deployments, knowledge sources are heterogeneous and evolve over time, introducing both retrieval complexity and recurring indexing costs. The HUPEDCARE project addresses this challenge through a multimodal RAG pipeline that normalizes content into a unified master context and updates vector embeddings only when relevant changes are detected.
+
+This paper is guided by the following research questions:
+\begin{enumerate}[label=RQ\arabic*:,leftmargin=2.4cm]
+	\item Does multimodal RAG improve factual answer quality over non-retrieval and text-only baselines?
+	\item Does incremental hash-based updating reduce processing cost and indexing latency without degrading answer quality?
+	\item What is the marginal impact of each source family (SQL, web pages, documents, images, audio)?
+	\item How does chunking granularity affect retrieval recall, end-to-end latency, and final response quality?
+\end{enumerate}
+
+\section{Related Work}
+
+Retrieval-Augmented Generation (RAG) has become a practical pattern for reducing hallucinations and improving factual grounding in large language model systems. Early formulations combine dense retrieval with sequence generation \cite{lewis2020rag}, while subsequent systems emphasize modular retrieval stacks, orchestration, and production constraints \cite{gao2023retrieval,siriwardhana2023improving}. The present project follows this line by explicitly separating indexing and serving concerns and by enforcing source-aware prompt construction.
+
+Our retrieval layer relies on vector similarity over chunked context representations, consistent with dense retrieval paradigms such as DPR \cite{karpukhin2020dpr}. The effectiveness of this design is closely related to embedding quality and chunk construction. Recent embedding models have improved semantic retrieval quality in practical deployments \cite{openai2024embeddings}. In addition, chunk size and overlap are known to trade off recall, latency, and context coherence, motivating the parameter-sensitivity analysis proposed in this paper.
+
+The multimodal component (images and audio alongside textual/SQL sources) is aligned with the broader trend toward unified multimodal models and pipelines \cite{openai2023gpt4v}. In domain environments, however, multimodal extraction introduces additional noise channels (OCR errors, transcription variance), making robust normalization and provenance tagging essential. Our method addresses this by converting all sources into a single master context with explicit source delimiters.
+
+From an operational perspective, cost-aware update strategies are increasingly relevant as embedding and generation APIs dominate recurrent expenditure. Incremental computation based on content hashes has long been a standard systems optimization and is naturally applicable to RAG indexing pipelines: unchanged corpora should not trigger full re-embedding. This paper contributes an empirical evaluation of that policy under realistic update regimes.
+
+Evaluation methodology follows QA and retrieval best practices, combining quality metrics (factual correctness, grounding) with retrieval indicators (Recall@$k$, MRR) and systems metrics (latency/cost). The emphasis on multi-objective analysis is consistent with emerging guidance for robust LLM system evaluation \cite{chang2024survey,ragas2024}.
+
+\section{Method}
+
+\subsection{System Overview}
+
+The proposed architecture consists of two offline/online stages:
+\begin{enumerate}[leftmargin=1.2cm]
+	\item \textbf{Offline ingestion and indexing stage}: source synchronization, extraction, context assembly, and vector database update.
+	\item \textbf{Online serving stage}: retrieval and generation through a FastAPI endpoint that combines query-time retrieved context with a constrained system prompt.
+\end{enumerate}
+
+The implementation is organized as follows:
+\begin{itemize}[leftmargin=1.2cm]
+	\item \texttt{src/collector.py}: orchestration of ingestion and indexing.
+	\item \texttt{src/utils/helper.py}: extraction utilities and metadata persistence.
+	\item \texttt{src/utils/sql\_collector.py}: SQL-based structured content export.
+	\item \texttt{src/utils/ftp\_collector.py}: FTP synchronization with timestamp-aware mirroring.
+	\item \texttt{src/utils/vector\_processor.py}: context chunking and ChromaDB indexing.
+	\item \texttt{src/server.py}: query-time retrieval and answer generation.
+\end{itemize}
+
+\placeholderfigure[0.92\linewidth]{images/architecture_overview.png}{End-to-end architecture from ingestion and indexing to online serving.}{fig:architecture-overview}
+
+Figure~\ref{fig:architecture-overview} summarizes the full data and inference lifecycle implemented in this project.
+
+\subsection{Data Ingestion and Normalization}
+
+The ingestion pipeline processes heterogeneous sources into a unified textual representation:
+\begin{itemize}[leftmargin=1.2cm]
+	\item \textbf{File sources}: HTML/PHP, TXT, PDF, DOCX, legacy DOC, image files, and audio files.
+	\item \textbf{Database sources}: SQL queries configured in \texttt{config/config.yaml} and executed against MySQL.
+\end{itemize}
+
+For each source type, extraction functions normalize content into plain text, remove boilerplate/noise, and produce cache-ready records. All cache records are merged into \texttt{data/master\_context.txt} with explicit source headers to support response grounding.
+
+\subsection{Incremental Update Policy}
+
+To avoid unnecessary embedding recomputation, the pipeline computes a hash of \texttt{master\_context.txt} and stores it in metadata. Let $H_t$ be the hash at run $t$ and $H_{t-1}$ be the previously stored hash. Reindexing is triggered only if:
+\begin{equation}
+H_t \neq H_{t-1}.
+\end{equation}
+
+This policy reduces API usage and runtime when source updates are sparse while preserving retrieval freshness after meaningful context changes.
+
+\subsection{Chunking and Vector Index Construction}
+
+The context text is segmented using a recursive splitter with configurable chunk size and overlap. Source delimiters (for example, source headers and SQL record markers) are prioritized as separators so semantically related snippets remain grouped. Chunks are embedded with the configured embedding model and inserted into a ChromaDB collection (\texttt{rag\_context}).
+
+\subsection{Online Retrieval and Generation}
+
+At inference time, the API receives a user question, retrieves top-$k$ chunks from the vector store, and injects them into the system prompt context block. The answer is generated by the configured chat model with constrained prompting that emphasizes source-aligned responses.
+
+Formally, for query $q$, retriever $R$ returns:
+\begin{equation}
+C_q = R(q, k) = \{c_1, c_2, ..., c_k\},
+\end{equation}
+and the generator produces:
+\begin{equation}
+y = G\left(q, C_q, p_{sys}\right),
+\end{equation}
+where $p_{sys}$ is the system instruction template from configuration.
+
+\subsection{Implementation and Reproducibility Considerations}
+
+The system behavior is controlled through \texttt{config/config.yaml} and environment variables. Logging is centralized through rotating file handlers and console output, enabling traceability for ingestion, retrieval, and serving. Experimental reproducibility requires fixed model versions, fixed retrieval parameters, and a frozen test question set.
+
+\section{Experimental Design}
+
+\subsection{Experimental Goals}
+
+The experimental campaign is designed to evaluate:
+\begin{enumerate}[leftmargin=1.2cm]
+	\item answer quality and grounding,
+	\item system latency and throughput,
+	\item indexing and inference cost,
+	\item robustness under varying update and source-ablation conditions.
+\end{enumerate}
+
+\subsection{Research Variables}
+
+\textbf{Independent variables}
+\begin{itemize}[leftmargin=1.2cm]
+	\item Retrieval mode: no-RAG, text-only RAG, multimodal RAG.
+	\item Update mode: full rebuild vs incremental hash-based update.
+	\item Source configuration: all sources vs ablation of one source family.
+	\item Chunking parameters: chunk size and overlap grid.
+\end{itemize}
+
+\textbf{Dependent variables}
+\begin{itemize}[leftmargin=1.2cm]
+	\item Quality: factual correctness, semantic F1, grounding rate, hallucination rate.
+	\item Retrieval: Recall@$k$, Mean Reciprocal Rank (MRR).
+	\item Systems: ingestion time, indexing time, end-to-end latency (p50/p95), throughput.
+	\item Cost: number of embedded chunks, model-call count, estimated API cost per run and per 100 queries.
+\end{itemize}
+
+\subsection{Benchmark Construction}
+
+A domain benchmark should be built with at least 150--300 questions, stratified by:
+\begin{itemize}[leftmargin=1.2cm]
+	\item direct factual lookup,
+	\item cross-source aggregation,
+	\item ambiguity resolution,
+	\item out-of-context queries.
+\end{itemize}
+
+Each item should include expected answer criteria and, when possible, expected source attribution. The benchmark should be split into development and test subsets and evaluated over repeated runs.
+
+\subsection{Baselines and Ablations}
+
+\begin{itemize}[leftmargin=1.2cm]
+	\item \textbf{Baseline A}: direct chat model without retrieval.
+	\item \textbf{Baseline B}: RAG with text-only corpus.
+	\item \textbf{System C}: full multimodal incremental RAG.
+\end{itemize}
+
+Ablation studies remove one source family at a time (for example SQL, images, audio) to estimate marginal contribution to quality and grounding.
+
+\subsection{Protocol}
+
+\begin{enumerate}[leftmargin=1.2cm]
+	\item Freeze configuration and model versions.
+	\item Build or refresh context according to the update mode.
+	\item Execute the full benchmark on each configuration.
+	\item Repeat each configuration at least three times to capture variance.
+	\item Aggregate metrics and compute confidence intervals.
+\end{enumerate}
+
+\placeholderfigure[0.88\linewidth]{images/experimental_workflow.png}{Experimental workflow from benchmark preparation to statistical analysis.}{fig:experimental-workflow}
+
+Figure~\ref{fig:experimental-workflow} defines the evaluation pipeline used to ensure consistent comparisons across all baselines and ablations.
+
+\subsection{Statistical Analysis}
+
+For paired correctness outcomes across systems, McNemar testing can be applied. For aggregate metric differences, bootstrap confidence intervals (95\%) are recommended. Along with p-values, effect sizes should be reported to quantify practical significance.
+
+\subsection{Threats to Validity}
+
+\begin{itemize}[leftmargin=1.2cm]
+	\item \textbf{Internal validity}: extraction noise from OCR/transcription and source parsing errors.
+	\item \textbf{Construct validity}: mismatch between evaluation rubric and real user utility.
+	\item \textbf{External validity}: domain-specific conclusions may not transfer directly to other verticals.
+	\item \textbf{Temporal validity}: model or API updates can shift observed performance over time.
+\end{itemize}
+
+\section{Results}
+
+This section is organized to answer each research question with quantitative evidence. Replace placeholders with measured values from your benchmark runs.
+
+\subsection{RQ1: Quality and Grounding Across Baselines}
+
+\begin{table}[H]
+\centering
+\caption{Answer quality and grounding by baseline configuration.}
+\label{tab:rq1-quality}
+\begin{tabular}{lcccc}
+\toprule
+Configuration & Exact Match & Semantic F1 & Grounding Rate & Hallucination Rate \\
+\midrule
+No-RAG baseline & -- & -- & -- & -- \\
+Text-only RAG & -- & -- & -- & -- \\
+Multimodal incremental RAG & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Interpretation template.} The multimodal configuration improved factual quality by \emph{X}\% over the no-RAG baseline and by \emph{Y}\% over text-only RAG, while reducing hallucination rate by \emph{Z} points.
+
+\subsection{RQ2: Cost and Latency Impact of Incremental Updates}
+
+\begin{table}[H]
+\centering
+\caption{Update-mode comparison for indexing efficiency and serving behavior.}
+\label{tab:rq2-cost-latency}
+\begin{tabular}{lcccc}
+\toprule
+Update mode & Re-embedded chunks & Indexing time (s) & API cost / run & p95 answer latency (ms) \\
+\midrule
+Full rebuild & -- & -- & -- & -- \\
+Incremental hash-based & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Interpretation template.} Hash-based updates reduced embedding calls by \emph{X}\% and indexing time by \emph{Y}\% without statistically significant quality loss.
+
+\subsection{RQ3: Source Ablation Analysis}
+
+\begin{table}[H]
+\centering
+\caption{Marginal contribution of each source family.}
+\label{tab:rq3-ablation}
+\begin{tabular}{lccc}
+\toprule
+Configuration & Exact Match & Grounding Rate & Delta vs full system \\
+\midrule
+Full system (all sources) & -- & -- & 0.00 \\
+Without SQL & -- & -- & -- \\
+Without image descriptions & -- & -- & -- \\
+Without audio transcriptions & -- & -- & -- \\
+Without file-based documents & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Interpretation template.} The largest degradation appeared when removing \emph{source S}, indicating that this source category contributes most to domain factuality.
+
+\subsection{RQ4: Chunking Sensitivity}
+
+\begin{table}[H]
+\centering
+\caption{Chunk-size and overlap sensitivity analysis.}
+\label{tab:rq4-chunking}
+\begin{tabular}{cccccc}
+\toprule
+Chunk size & Overlap & Recall@$k$ & MRR & Exact Match & p95 latency (ms) \\
+\midrule
+Small / low overlap & -- & -- & -- & -- & -- \\
+Medium / medium overlap & -- & -- & -- & -- & -- \\
+Large / high overlap & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Interpretation template.} Medium chunk settings provided the best quality-latency compromise, with higher retrieval quality than large chunks and lower latency than very fine chunking.
+
+\subsection{Statistical Significance Summary}
+
+\begin{table}[H]
+\centering
+\caption{Significance tests for key pairwise comparisons.}
+\label{tab:stats-summary}
+\begin{tabular}{lccc}
+\toprule
+Comparison & Test & p-value & Effect size \\
+\midrule
+Multimodal RAG vs no-RAG & McNemar / bootstrap & -- & -- \\
+Multimodal RAG vs text-only RAG & McNemar / bootstrap & -- & -- \\
+Incremental vs full rebuild & Bootstrap CI & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Error Analysis}
+
+Report qualitative failure modes with representative examples, such as source mismatch, stale context, OCR/transcription artifacts, and retrieval misses. A compact taxonomy table is recommended for reproducibility.
+
+\section{Discussion}
+
+Interpret the empirical findings in terms of trade-offs between quality, cost, and operational complexity. Highlight where multimodality provides substantial gains and where simpler pipelines may remain competitive.
+
+\section{Limitations and Future Work}
+
+Candidate future directions include: confidence calibration, adaptive retrieval depth, temporal decay weighting for stale content, automated benchmark expansion, and stronger attribution verification.
+
+\section{Conclusion}
+
+This paper template describes a reproducible route for evaluating a practical multimodal incremental RAG assistant. The proposed methodology enables rigorous analysis of factual quality, grounding behavior, and cost-aware update strategies in real deployment settings.
+
+\section*{Reproducibility Checklist}
+
+\begin{itemize}[leftmargin=1.2cm]
+	\item Source code version and commit hash.
+	\item Exact \texttt{config.yaml} used for experiments (excluding secrets).
+	\item Model and embedding version identifiers.
+	\item Benchmark question set and annotation protocol.
+	\item Metric definitions and evaluation scripts.
+\end{itemize}
+
+\section*{Submission Readiness Checklist}
+
+\begin{itemize}[leftmargin=1.2cm]
+	\item Related Work includes up-to-date references and explicit positioning.
+	\item All claims in Results are backed by a table, figure, or statistical test.
+	\item Experimental protocol includes benchmark split, repetitions, and fixed settings.
+	\item Figures are exported and present in \texttt{docs/images/}.
+	\item Bibliography compiles without missing entries.
+	\item Language and formatting match target venue guidelines.
+	\item Limitations and ethical considerations are explicitly discussed.
+\end{itemize}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
