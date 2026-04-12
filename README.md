@@ -68,6 +68,8 @@ The system is split into four runtime areas:
 │   └── images/
 ├── logs/
 ├── scripts/
+│   ├── export_mermaid.bat
+│   ├── export_mermaid.sh
 │   ├── setup.bat
 │   ├── setup.sh
 │   ├── supervisor.bat
@@ -89,8 +91,9 @@ The system is split into four runtime areas:
 │   ├── plugin.css
 │   └── plugin.js
 ├── README.md
+├── requirements-dev.txt
 ├── requirements.txt
-└── TODO.txt
+└── pyproject.toml
 ```
 
 ## Configuration
@@ -154,6 +157,13 @@ curl http://127.0.0.1:8000/metrics
 ```
 
 This endpoint exposes in-memory request counters and `/ask` latency statistics.
+
+### API endpoint summary
+
+- `POST /ask`: retrieval-augmented answer generation.
+- `GET /health`: liveness probe.
+- `GET /ready`: readiness probe with dependency checks.
+- `GET /metrics`: in-memory operational counters and latency aggregates.
 
 ### Run the CLI client
 
@@ -230,10 +240,37 @@ Optional compose workflow:
 docker compose up --build
 ```
 
+Run only the API service with compose:
+
+```bash
+docker compose up --build api
+```
+
 Run collector as a one-shot container with compose profile:
 
 ```bash
 docker compose --profile collector run --rm collector
+```
+
+This uses the `collector` profile in [docker-compose.yml](docker-compose.yml) and
+mounts `data/` and `logs/` as persistent volumes.
+
+## Git Hygiene
+
+Runtime artifacts are intentionally excluded from version control through
+[.gitignore](.gitignore), including:
+
+- local environments (`.venv/`, `venv/`)
+- secrets (`.env` and `.env.*`, except `.env.structure`)
+- runtime data and logs (`data/`, `logs/`, `temp/`, `*.log`)
+- caches and reports (`__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `.coverage*`, `htmlcov/`)
+
+After changing ignore rules, remove previously tracked artifacts from index while keeping local files:
+
+```bash
+git rm -r --cached data logs temp .venv venv
+git rm --cached .coverage
+git commit -m "chore: untrack runtime artifacts"
 ```
 
 ## Deployment Guide
