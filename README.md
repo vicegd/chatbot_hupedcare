@@ -127,6 +127,66 @@ python src/client.py
 
 The `scripts/` directory contains Windows and shell helpers for setup, supervision, and dependency refresh.
 
+## Deployment Guide
+
+### Required environment variables
+
+Create a `.env` file (or equivalent secrets configuration in your deployment platform) and define at least the following variables:
+
+- `MODEL_API_KEY`: API key for the language and embedding provider.
+- `FTP_HOST`: FTP server hostname.
+- `FTP_USER`: FTP username.
+- `FTP_PASSWORD`: FTP password.
+- `FTP_REMOTE_PATH`: Remote base directory for mirrored files (default is `/`).
+- `DB_HOST`: MySQL host.
+- `DB_USER`: MySQL user.
+- `DB_PASSWORD`: MySQL password.
+- `DB_NAME`: MySQL database name.
+
+Optional variables can be introduced according to your provider requirements, but the keys above cover the current ingestion and serving flow.
+
+### Production startup sequence
+
+1. Configure [config/config.yaml](config/config.yaml) with production values for `server`, `database`, `embeddings`, and `logger`.
+2. Ensure `storage.data_folder` points to a persistent path mounted in your runtime.
+3. Run one ingestion cycle before exposing the API:
+	- `python src/collector.py`
+4. Start the API service:
+	- `python src/server.py`
+5. Point the frontend widget URL in [web/plugin.js](web/plugin.js) to your public backend endpoint.
+
+### Recommended production practices
+
+- Run `src/collector.py` on a schedule (for example with cron, Task Scheduler, or your process supervisor) rather than continuously.
+- Keep `data/` and `logs/` on persistent storage.
+- Restrict CORS in `config.yaml` to trusted origins only.
+- Enable process supervision and automatic restarts for the API process.
+- Rotate and retain logs according to your compliance needs.
+
+## Architecture Diagram
+
+```mermaid
+flowchart TD
+	 A[FTP Server] --> B[src/utils/ftp_collector.py]
+	 C[MySQL Database] --> D[src/utils/sql_collector.py]
+	 E[Local Files in data/TEMP_DOWNLOADS] --> F[src/utils/helper.py]
+
+	 B --> E
+	 F --> G[data/CACHE_TEXT]
+	 D --> H[src/collector.py]
+	 G --> H
+	 H --> I[data/master_context.txt]
+	 I --> J[src/utils/vector_processor.py]
+	 J --> K[ChromaDB data/vector_db]
+
+	 L[User / Widget / CLI] --> M[src/server.py /ask]
+	 M --> K
+	 M --> N[LLM API]
+	 K --> M
+	 N --> M
+	 M --> L
+```
+
 ## Supported Inputs
 
 The ingestion pipeline currently handles:
