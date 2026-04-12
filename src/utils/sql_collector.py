@@ -8,6 +8,7 @@ logger = logger.setup_logger(logger_name="sql_collector", log_filename="sql_coll
 def collect_sql_data(config):
     text_output = "--- DATABASE EXPORT ---\n"
     try:
+        logger.debug("Opening MySQL connection for SQL collection")
         connection = mysql.connector.connect(
             host=os.getenv("DB_HOST"),
             user=os.getenv("DB_USER"),
@@ -18,13 +19,17 @@ def collect_sql_data(config):
         cursor = connection.cursor(dictionary=True)
         
         queries = config.get('database', {}).get('queries', [])
+        logger.debug(f"Configured SQL query count: {len(queries)}")
         
         if not queries:
+            logger.debug("No SQL queries configured")
             return "No queries configured in config.yaml"
         
         for query in queries:
+            logger.debug(f"Executing SQL query: {query}")
             cursor.execute(query)
             rows = cursor.fetchall()
+            logger.debug(f"Rows returned by query: {len(rows)}")
             
             for row in rows:
                 header = ""
@@ -79,9 +84,10 @@ def collect_sql_data(config):
                 if final_text.strip():
                     text_output += f"{final_text}\n"
         
-            connection.close()
+        connection.close()
+        logger.debug("Closed MySQL connection after SQL collection")
         return text_output
         
     except Exception as e:
-        logger.error(f"MySQL Error: {e}")
+        logger.exception(f"MySQL error: {e}")
         return f"MySQL Error: {e}"

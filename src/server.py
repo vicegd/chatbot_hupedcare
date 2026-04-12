@@ -26,6 +26,7 @@ PROJECT_ROOT = get_project_root()
 logger = logger.setup_logger(logger_name="fastapi_server", log_filename="server.log")
 load_dotenv()
 config = helper.config
+logger.debug(f"Server project root resolved to {PROJECT_ROOT}")
 
 # 2. EMBEDDING CONFIGURATION 
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -38,6 +39,7 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
 folder_name = config['storage'].get('data_folder', 'data').lower()
 db_path_obj = PROJECT_ROOT / folder_name / "vector_db"
 db_path = str(db_path_obj) # ChromaDB requires a string
+logger.debug(f"ChromaDB path resolved to {db_path}")
 
 # Ensure the database folder exists before connecting
 os.makedirs(db_path, exist_ok=True)
@@ -71,6 +73,7 @@ class Query(BaseModel):
 @app.post("/ask")
 async def answer_user(item: Query):
     try:
+        logger.debug(f"Received question with length {len(item.question)}")
         # 1. RETRIEVAL: Refresh connection just in case the collector recreated it
         try:
             # We fetch the collection dynamically on every single request
@@ -90,6 +93,7 @@ async def answer_user(item: Query):
             query_texts=[item.question],
             n_results=config['embeddings']['top_k']
         )
+        logger.debug(f"Retrieved {len(results['documents'][0]) if results.get('documents') else 0} context chunks")
         retrieved_context = "\n---\n".join(results['documents'][0])
         
         # 2. CONSTRUCTION: Combine YAML prompt with actual retrieved data
@@ -108,6 +112,7 @@ async def answer_user(item: Query):
             ],
             temperature=config['embeddings']['temperature']
         )
+        logger.debug("OpenAI chat completion generated successfully")
         
         return {
             "response": response.choices[0].message.content,
@@ -115,7 +120,7 @@ async def answer_user(item: Query):
         }
         
     except Exception as e:
-        logger.error(f"Error processing question '{item.question}': {e}")
+        logger.exception(f"Error processing question '{item.question}': {e}")
         return {"error": str(e)}
 
 def get_server_bind(config):
@@ -126,7 +131,9 @@ def get_server_bind(config):
             port = parsed.port
             if port is None:
                 port = 443 if parsed.scheme == 'https' else 80
+            logger.debug(f"Server bind derived from public_url: host={parsed.hostname}, port={port}")
             return parsed.hostname, port
+    logger.debug(f"Server bind derived from host/port config: host={config['server']['host']}, port={config['server']['port']}")
     return config['server']['host'], config['server']['port']
 
 # 7. EXECUTION ENTRY POINT

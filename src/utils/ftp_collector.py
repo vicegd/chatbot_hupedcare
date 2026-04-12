@@ -21,12 +21,14 @@ def sync_ftp_files(metadata, temp_folder):
     try:
         host = os.getenv("FTP_HOST")
         logger.info(f"Connecting to FTP: {host}")
+        logger.debug(f"FTP sync target folder: {temp_folder}")
         
         ftp = FTP(host)
         ftp.login(user=os.getenv("FTP_USER"), passwd=os.getenv("FTP_PASSWORD"))
         
         remote_root = os.getenv("FTP_REMOTE_PATH", "/")
         ftp.cwd(remote_root)
+        logger.debug(f"FTP remote root set to {remote_root}")
 
         def walk_recursive(remote_path, local_path):
             """Internal helper to navigate FTP folders and download files."""
@@ -44,11 +46,13 @@ def sync_ftp_files(metadata, temp_folder):
 
                     if facts['type'] == 'dir':
                         #It's a folder, go deeper
+                        logger.debug(f"Descending into FTP directory: {remote_full_path}")
                         walk_recursive(remote_full_path, local_full_path)
                     
                     elif facts['type'] == 'file':
                         if name.lower().endswith(VALID_EXTENSIONS):
                             remote_files_found.add(remote_full_path)
+                            logger.debug(f"Eligible remote file found: {remote_full_path}")
 
                             # 'mlsd' already gives us the date in the 'modify' key (e.g., 20231025143000)
                             remote_mtime = facts.get('modify')
@@ -68,15 +72,18 @@ def sync_ftp_files(metadata, temp_folder):
                                 
                                 metadata[remote_full_path] = remote_mtime
                                 updated_files.append(local_full_path)
+                            else:
+                                logger.debug(f"Skipping unchanged remote file: {remote_full_path}")
 
             except Exception as e:
-                logger.error(f"Error while walking {remote_path}: {e}")
+                logger.exception(f"Error while walking {remote_path}: {e}")
 
         # Start the recursive sync
         walk_recursive(remote_root, temp_folder)
 
         #PURGE local files that no longer exist on the server and clean metadata
         stored_paths = list(metadata.keys())
+        logger.debug(f"Metadata entries tracked before cleanup: {len(stored_paths)}")
         for path_in_meta in stored_paths:
             if path_in_meta not in remote_files_found:
                 logger.info(f"Was first deleted on server: {path_in_meta} -> Cleaning local copy...")
@@ -93,9 +100,10 @@ def sync_ftp_files(metadata, temp_folder):
                 del metadata[path_in_meta]
 
         ftp.quit()
+            logger.debug(f"FTP sync downloaded {len(updated_files)} updated files")
         logger.info("FTP Sync completed successfully.")
         return updated_files, metadata
 
     except Exception as e:
-        logger.error(f"FTP Fatal Error: {e}")
+            logger.exception(f"FTP fatal error: {e}")
         return [], metadata

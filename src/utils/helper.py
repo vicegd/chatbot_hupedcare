@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 import PyPDF2
 from docx import Document
 from openai import OpenAI
+import utils.logger as logger
+
+logger = logger.setup_logger(logger_name="helper", log_filename="helper.log")
 
 # Initialization
 config_path = None
@@ -18,11 +21,13 @@ def load_config():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(base_dir, '..', '..'))
     config_path = os.path.join(project_root, 'config', 'config.yaml')
+    logger.debug(f"Loading configuration from {config_path}")
     with open(config_path, 'r', encoding='utf-8') as file_handle:
         return yaml.safe_load(file_handle)
     
 def load_metadata():
     metadata_file_path = os.path.join(config['storage']['data_folder'], ".metadata.json")
+    logger.debug(f"Loading metadata from {metadata_file_path}")
     if os.path.exists(metadata_file_path):
         with open(metadata_file_path, "r") as file_handle:
             return json.load(file_handle)
@@ -30,6 +35,7 @@ def load_metadata():
 
 def save_metadata(metadata):
     metadata_file_path = os.path.join(config['storage']['data_folder'], ".metadata.json")
+    logger.debug(f"Saving metadata to {metadata_file_path}")
     with open(metadata_file_path, "w") as file_handle:
         json.dump(metadata, file_handle, indent=4)
 
@@ -38,12 +44,14 @@ config = load_config()
 config['storage']['data_folder'] = os.path.join(project_root, 'DATA')
 metadata = load_metadata()
 client = OpenAI(base_url=config['ai']['base_url'], api_key=os.getenv("MODEL_API_KEY"))
+logger.debug(f"Resolved storage data directory to {config['storage']['data_folder']}")
 
 def extract_clean_text(raw_text):
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
     return "\n".join(lines)
 
 def extract_from_html_or_php(file_path):
+    logger.debug(f"Extracting text from HTML/PHP file: {file_path}")
     with open(file_path, "r", encoding="utf-8", errors="ignore") as file_handle:
         content = file_handle.read()
     content = re.sub(r'<\?php.*?\?>', '', content, flags=re.DOTALL | re.IGNORECASE)
@@ -55,15 +63,18 @@ def extract_from_html_or_php(file_path):
 def extract_from_pdf(file_path):
     extracted_text = ""
     try:
+        logger.debug(f"Extracting text from PDF file: {file_path}")
         with open(file_path, "rb") as file_handle:
             reader = PyPDF2.PdfReader(file_handle)
             for page in reader.pages:
                 extracted_text += page.extract_text() + "\n"
-    except Exception as e: print(f"PDF Error: {e}")
+    except Exception as e:
+        logger.exception(f"PDF extraction error for {file_path}: {e}")
     return extract_clean_text(extracted_text)
 
 def extract_description_from_image_with_ai(image_path):
     try:
+        logger.debug(f"Generating AI description for image: {image_path}")
         with open(image_path, "rb") as img:
             b64_img = base64.b64encode(img.read()).decode('utf-8')
         response = client.chat.completions.create(
@@ -75,11 +86,13 @@ def extract_description_from_image_with_ai(image_path):
             max_tokens=300
         )
         return response.choices[0].message.content
-    except Exception as e: return f"Vision Error: {e}"
+    except Exception as e:
+        logger.exception(f"Image description error for {image_path}: {e}")
+        return f"Vision Error: {e}"
 
 def extract_description_from_audio_with_ai(audio_path):
     try:
-        print(f"  -> Sending audio to Whisper...")
+        logger.debug(f"Sending audio file to transcription model: {audio_path}")
         with open(audio_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
                 model=config['ai']['transcription_model'], 
@@ -88,12 +101,13 @@ def extract_description_from_audio_with_ai(audio_path):
             
         return f"AUDIO TRANSCRIPTION: {transcription}"
     except Exception as e:
-        print(f"Audio Error in {audio_path}: {e}")
+        logger.exception(f"Audio transcription error for {audio_path}: {e}")
         return "Error transcribing audio content."
 
 def extract_from_docx(file_path):
     """Extract text from modern .docx files."""
     try:
+        logger.debug(f"Extracting text from DOCX file: {file_path}")
         doc = Document(file_path)
         full_text = []
         for para in doc.paragraphs:
@@ -105,7 +119,7 @@ def extract_from_docx(file_path):
                     full_text.append(cell.text)
         return extract_clean_text("\n".join(full_text))
     except Exception as e:
-        print(f"Error processing DOCX {file_path}: {e}")
+        logger.exception(f"DOCX extraction error for {file_path}: {e}")
         return ""
 
 def extract_from_doc(file_path):
@@ -113,6 +127,7 @@ def extract_from_doc(file_path):
     Zero-dependency extractor for legacy .doc files.
     """
     try:
+        logger.debug(f"Extracting text from legacy DOC file: {file_path}")
         with open(file_path, 'rb') as file_handle:
             content = file_handle.read()
 
@@ -140,5 +155,5 @@ def extract_from_doc(file_path):
         return extract_clean_text(combined_text)
 
     except Exception as e:
-        print(f"Binary scraper failed for {file_path}: {e}")
+        logger.exception(f"Legacy DOC extraction error for {file_path}: {e}")
         return ""
