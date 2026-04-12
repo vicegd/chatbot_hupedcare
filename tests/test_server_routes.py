@@ -11,7 +11,7 @@ def _find_route_decorator_path(decorator: ast.AST) -> str | None:
     return None
 
 
-def test_server_exposes_health_and_ready_routes() -> None:
+def test_server_exposes_operational_routes() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     server_path = repo_root / "src" / "server.py"
     server_ast = ast.parse(server_path.read_text(encoding="utf-8"))
@@ -27,3 +27,4 @@ def test_server_exposes_health_and_ready_routes() -> None:
 
     assert "/health" in found_routes
     assert "/ready" in found_routes
+    assert "/metrics" in found_routes

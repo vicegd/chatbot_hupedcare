@@ -1,11 +1,13 @@
 import os
+import time
 from pathlib import Path
+from threading import Lock
 from urllib.parse import urlparse
 
 import chromadb
 from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from openai import OpenAI
@@ -72,6 +74,17 @@ collection = chroma_client.get_or_create_collection(
 # 4. SERVER AND AI CLIENT INITIALIZATION
 app = FastAPI()
 
+# Lightweight in-memory metrics for operational visibility.
+METRICS_LOCK = Lock()
+METRICS = {
+    "total_requests": 0,
+    "ask_requests": 0,
+    "ask_success": 0,
+    "ask_errors": 0,
+    "ask_latency_ms_sum": 0.0,
+    "ask_latency_ms_max": 0.0,
+}
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -87,6 +100,41 @@ client = OpenAI(api_key=model_api_key)
 
 class Query(BaseModel):
     question: str
+
+
+@app.middleware("http")
+async def capture_metrics(request: Request, call_next):
+    """Capture request counters and latency for basic observability."""
+    started_at = time.perf_counter()
+    path = request.url.path
+
+    with METRICS_LOCK:
+        METRICS["total_requests"] += 1
+        if path == "/ask":
+            METRICS["ask_requests"] += 1
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        if path == "/ask":
+            latency_ms = (time.perf_counter() - started_at) * 1000
+            with METRICS_LOCK:
+                METRICS["ask_errors"] += 1
+                METRICS["ask_latency_ms_sum"] += latency_ms
+                METRICS["ask_latency_ms_max"] = max(METRICS["ask_latency_ms_max"], latency_ms)
+        raise
+
+    if path == "/ask":
+        latency_ms = (time.perf_counter() - started_at) * 1000
+        with METRICS_LOCK:
+            METRICS["ask_latency_ms_sum"] += latency_ms
+            METRICS["ask_latency_ms_max"] = max(METRICS["ask_latency_ms_max"], latency_ms)
+            if response.status_code < 500:
+                METRICS["ask_success"] += 1
+            else:
+                METRICS["ask_errors"] += 1
+
+    return response
 
 @app.get("/health")
 async def health_check():
@@ -119,6 +167,23 @@ async def readiness_check():
         return {"status": status, "checks": checks}
 
     return JSONResponse(status_code=503, content={"status": status, "checks": checks})
+
+
+@app.get("/metrics")
+async def metrics():
+    """Return basic request and latency counters for dashboards and probes."""
+    with METRICS_LOCK:
+        ask_requests = METRICS["ask_requests"]
+        avg_latency_ms = (
+            METRICS["ask_latency_ms_sum"] / ask_requests if ask_requests > 0 else 0.0
+        )
+        snapshot = {
+            **METRICS,
+            "ask_latency_ms_avg": round(avg_latency_ms, 3),
+            "uptime_status": "ok",
+        }
+
+    return snapshot
 
 @app.post("/ask")
 async def answer_user(item: Query):

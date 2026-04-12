@@ -1,17 +1,39 @@
-# Entorno virtual
+# Python environments
 .venv/
 venv/
 
-# Variables de entorno
+# Environment and secrets
 .env
+.env.*
+!.env.structure
 
-# Carpetas de datos y temporales
+# Runtime data and logs
 data/
 temp/
-logs/ 
+logs/
+*.log
 
-# Otros
+# Python cache and artifacts
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build/package artifacts
+build/
+dist/
+*.egg-info/
+
+# OS and editor files
 .DS_Store
+Thumbs.db
+.vscode/
+
+# Project-local notes
 TODO.txt

@@ -145,6 +145,16 @@ curl http://127.0.0.1:8000/ready
 This endpoint checks API key presence, vector database path availability, and
 `rag_context` collection access.
 
+### Metrics endpoint
+
+For lightweight observability, use:
+
+```bash
+curl http://127.0.0.1:8000/metrics
+```
+
+This endpoint exposes in-memory request counters and `/ask` latency statistics.
+
 ### Run the CLI client
 
 ```bash
@@ -153,13 +163,26 @@ python src/client.py
 
 ### Use helper scripts
 
-The `scripts/` directory contains Windows and shell helpers for setup, supervision, and dependency refresh.
+The `scripts/` directory contains Windows and shell helpers for setup, supervision, dependency refresh, and Mermaid export.
+
+Export documentation diagrams manually:
+
+```bash
+bash scripts/export_mermaid.sh
+```
+
+On Windows (cmd):
+
+```bat
+scripts\export_mermaid.bat
+```
 
 ## Development and CI
 
 This repository includes:
 
 - GitHub Actions workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml)
+- Release workflow: [.github/workflows/release.yml](.github/workflows/release.yml)
 - Ruff lint configuration: [pyproject.toml](pyproject.toml)
 - Smoke tests: [tests](tests)
 
@@ -182,6 +205,8 @@ ruff check src tests
 pytest -q
 pre-commit run --all-files
 ```
+
+Create a GitHub release by pushing a tag like `v1.0.0`.
 
 For contribution guidelines and pull-request expectations, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
