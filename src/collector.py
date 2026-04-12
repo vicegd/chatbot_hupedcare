@@ -1,9 +1,9 @@
-import os
-import utils.helper as helper
-import utils.ftp_collector as ftp_c
-import utils.sql_collector as sql_c
 import hashlib
+import os
+import utils.ftp_collector as ftp_collector
+import utils.helper as helper
 import utils.logger as logger
+import utils.sql_collector as sql_collector
 
 logger = logger.setup_logger(logger_name="data_collector", log_filename="collector.log")
 
@@ -19,99 +19,99 @@ def run_collector():
     config = helper.config
     metadata = helper.metadata
 
-    temp_folder = os.path.join(config['storage']['data_folder'], "TEMP_DOWNLOADS")
-    cache_folder = os.path.join(config['storage']['data_folder'], "CACHE_TEXT")
+    temp_downloads_dir = os.path.join(config['storage']['data_folder'], "TEMP_DOWNLOADS")
+    cache_text_dir = os.path.join(config['storage']['data_folder'], "CACHE_TEXT")
     
-    if not os.path.exists(temp_folder): os.makedirs(temp_folder)
-    if not os.path.exists(cache_folder): os.makedirs(cache_folder)
+    if not os.path.exists(temp_downloads_dir): os.makedirs(temp_downloads_dir)
+    if not os.path.exists(cache_text_dir): os.makedirs(cache_text_dir)
 
-    #1. SYNC FTP FILES
+    # 1. SYNC FTP FILES
     logger.info("1. SYNCING FTP FILES...")
-    #updated_files, metadata = ftp_c.sync_ftp_files(metadata, temp_folder)
+    # updated_files, metadata = ftp_collector.sync_ftp_files(metadata, temp_downloads_dir)
 
-    #2. PURGE ORPHANED CACHE
+    # 2. PURGE ORPHANED CACHE
     logger.info("2. PURGING ORPHANED CACHE FILES...")
-    current_temp_files = set()
-    for root, _, files in os.walk(temp_folder):
-        for fname in files:
-            rel_path = os.path.relpath(os.path.join(root, fname), temp_folder)
-            current_temp_files.add(rel_path.replace(os.sep, "_") + ".txt")
+    expected_cache_files = set()
+    for root, _, files in os.walk(temp_downloads_dir):
+        for file_name in files:
+            relative_path = os.path.relpath(os.path.join(root, file_name), temp_downloads_dir)
+            expected_cache_files.add(relative_path.replace(os.sep, "_") + ".txt")
 
-    for c_file in os.listdir(cache_folder):
-        if c_file not in current_temp_files:
-            logger.info(f"Cleanup: Removing {c_file} (no longer in server)")
-            os.remove(os.path.join(cache_folder, c_file))
+    for cache_file_name in os.listdir(cache_text_dir):
+        if cache_file_name not in expected_cache_files:
+            logger.info(f"Cleanup: Removing {cache_file_name} (no longer on server)")
+            os.remove(os.path.join(cache_text_dir, cache_file_name))
 
-    #3. PROCESS FILES
-    logger.info(f"3. PROCESSING UPDATES IN {temp_folder}...")
-    for root, _, files in os.walk(temp_folder):
-        for fname in files:
-            f_path = os.path.join(root, fname)
-            rel_path = os.path.relpath(f_path, temp_folder)
-            c_path = os.path.join(cache_folder, rel_path.replace(os.sep, "_") + ".txt")
+    # 3. PROCESS FILES
+    logger.info(f"3. PROCESSING UPDATES IN {temp_downloads_dir}...")
+    for root, _, files in os.walk(temp_downloads_dir):
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            relative_path = os.path.relpath(file_path, temp_downloads_dir)
+            cache_file_path = os.path.join(cache_text_dir, relative_path.replace(os.sep, "_") + ".txt")
             
-            if not os.path.exists(c_path) or os.path.getmtime(f_path) > os.path.getmtime(c_path):
-                logger.info(f"  -> Processing: {rel_path}")
-                ext = f_path.lower()
-                desc = ""
+            if not os.path.exists(cache_file_path) or os.path.getmtime(file_path) > os.path.getmtime(cache_file_path):
+                logger.info(f"  -> Processing: {relative_path}")
+                normalized_path = file_path.lower()
+                extracted_text = ""
                 
                 try:
-                    if ext.endswith(('.html', '.htm', '.php')): 
-                        desc = helper.extract_from_html_or_php(f_path)
-                    elif ext.endswith(('.jpg', '.png', '.jpeg', '.webp')): 
-                        desc = helper.extract_description_from_image_with_ai(f_path)
-                    elif ext.endswith(('.mp3', '.wav', '.m4a', '.flac')):
-                        desc = helper.extract_description_from_audio_with_ai(f_path)
-                    elif ext.endswith('.docx'):
-                        desc = helper.extract_from_docx(f_path)
-                    elif ext.endswith('.doc'):
-                     desc = helper.extract_from_doc(f_path)
-                    elif ext.endswith('.pdf'): 
-                          desc = helper.extract_from_pdf(f_path)
-                    elif ext.endswith('.txt'):
-                          with open(f_path, 'r', encoding='utf-8', errors='ignore') as f:
-                             desc = helper.extract_clean_text(f.read())
+                    if normalized_path.endswith(('.html', '.htm', '.php')):
+                        extracted_text = helper.extract_from_html_or_php(file_path)
+                    elif normalized_path.endswith(('.jpg', '.png', '.jpeg', '.webp')):
+                        extracted_text = helper.extract_description_from_image_with_ai(file_path)
+                    elif normalized_path.endswith(('.mp3', '.wav', '.m4a', '.flac')):
+                        extracted_text = helper.extract_description_from_audio_with_ai(file_path)
+                    elif normalized_path.endswith('.docx'):
+                        extracted_text = helper.extract_from_docx(file_path)
+                    elif normalized_path.endswith('.doc'):
+                        extracted_text = helper.extract_from_doc(file_path)
+                    elif normalized_path.endswith('.pdf'):
+                        extracted_text = helper.extract_from_pdf(file_path)
+                    elif normalized_path.endswith('.txt'):
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as file_handle:
+                            extracted_text = helper.extract_clean_text(file_handle.read())
                
-                    with open(c_path, "w", encoding="utf-8") as f:
-                        f.write(desc if desc.strip() else "No relevant content found.")
+                    with open(cache_file_path, "w", encoding="utf-8") as file_handle:
+                        file_handle.write(extracted_text if extracted_text.strip() else "No relevant content found.")
                 except Exception as e:
-                    print(f"Error processing {fname}: {e}")
+                    print(f"Error processing {file_name}: {e}")
 
-    #4. ASSEMBLE MASTER CONTEXT
+    # 4. ASSEMBLE MASTER CONTEXT
     logger.info("4. ASSEMBLING MASTER CONTEXT...")
     unique_lines = set()
     master_lines = ["SYSTEM CONTEXT - RAG KNOWLEDGE BASE\n"]
     
-    #5. ADD SQL DATA
+    # 5. ADD SQL DATA
     logger.info("5. ADDING SQL DATA...")
-    master_lines.append(sql_c.collect_sql_data(config))
+    master_lines.append(sql_collector.collect_sql_data(config))
 
-    #6. ADD CACHED FILES WITH SOURCE HEADERS
+    # 6. ADD CACHED FILES WITH SOURCE HEADERS
     logger.info("6. ADDING CACHED FILES WITH SOURCE HEADERS...")
-    for c_file in os.listdir(cache_folder):
-        source_label = c_file.replace(".txt", "").replace("_", "/")
+    for cache_file_name in os.listdir(cache_text_dir):
+        source_label = cache_file_name.replace(".txt", "").replace("_", "/")
         source_added = False
         
-        with open(os.path.join(cache_folder, c_file), "r", encoding="utf-8") as f:
-            for line in f:
-                clean = line.strip()
-                if clean and clean not in unique_lines and "No relevant content found." not in clean:
+        with open(os.path.join(cache_text_dir, cache_file_name), "r", encoding="utf-8") as file_handle:
+            for line in file_handle:
+                clean_line = line.strip()
+                if clean_line and clean_line not in unique_lines and "No relevant content found." not in clean_line:
                     if not source_added:
                         master_lines.append(f"\n--- SOURCE: {source_label} ---")
                         source_added = True
                     
-                    unique_lines.add(clean)
-                    master_lines.append(clean)
+                    unique_lines.add(clean_line)
+                    master_lines.append(clean_line)
 
-    #7. SAVE EVERYTHING
+    # 7. SAVE EVERYTHING
     logger.info("7. SAVING MASTER CONTEXT...")
     output_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(master_lines))
+    with open(output_path, "w", encoding="utf-8") as file_handle:
+        file_handle.write("\n".join(master_lines))
     helper.save_metadata(metadata)
     logger.info(f"Done! Context rebuilt at {output_path}")
 
-    #8. UPDATE VECTOR DATABASE
+    # 8. UPDATE VECTOR DATABASE
     logger.info("8. UPDATING VECTOR DATABASE (EMBEDDINGS)...")
     master_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
     if os.path.exists(master_path):
@@ -127,8 +127,8 @@ def run_collector():
             logger.info("   -> [UPDATE] Changes detected! Sending data to OpenAI...")
             
             # 3. Call the worker to do the heavy lifting
-            import utils.vector_processor as vector_p
-            vector_p.update_vector_db()
+            import utils.vector_processor as vector_processor
+            vector_processor.update_vector_db()
             
             # 4. Save the new hash for next time
             metadata["master_context_hash"] = current_hash

@@ -22,7 +22,7 @@ def chat():
     
     while True:
         try:
-            # 1. USER INPUT (Green color for your writing)
+            # 1. USER INPUT (green color for user text)
             print(Style.BRIGHT + Fore.GREEN + ">>", end=" ")
             question = input()
 
@@ -44,7 +44,7 @@ def chat():
 
             if response.status_code == 200:
                 answer = response.json()['response']
-                # 3. IA RESPONSE (Blue/Cyan color for the AI)
+                # 3. AI RESPONSE (blue/cyan color for the assistant)
                 print(Style.BRIGHT + Fore.BLUE + "<< " + Style.NORMAL + Fore.WHITE + answer + "\n")
             else:
                 print(Fore.RED + f"Server Error: {response.status_code}")

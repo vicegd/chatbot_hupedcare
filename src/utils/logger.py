@@ -6,30 +6,29 @@ from pathlib import Path
 
 def get_project_root() -> Path:
     """
-    Busca de forma inteligente la raíz del proyecto.
-    Rastrea hacia arriba hasta encontrar la carpeta 'config' o el 'requirements.txt'.
+    Find the project root by walking upward until 'config' or 'requirements.txt' is found.
     """
-    # Empezamos en la carpeta donde está guardado ESTE archivo (logger.py)
+    # Start from the directory that contains this file.
     current_dir = Path(__file__).resolve().parent
     
-    # Revisamos la carpeta actual y las 3 superiores por si acaso
+    # Check the current directory and the next three parents.
     for directory in [current_dir, current_dir.parent, current_dir.parent.parent, current_dir.parent.parent.parent]:
-        # Si vemos que aquí existe una carpeta llamada 'config', ¡esta es la raíz!
+        # If a config directory or requirements file exists here, this is the root.
         if (directory / "config").is_dir() or (directory / "requirements.txt").exists():
             return directory
             
-    # Plan de emergencia: si no encuentra nada, asume que la raíz está un nivel por encima de este archivo
+    # Fallback: assume the project root is one level above this file.
     return current_dir.parent
 
 def setup_logger(logger_name: str, log_filename: str) -> logging.Logger:
     """
-    Crea un logger profesional. Configuración autónoma y detección de raíz absoluta.
+    Create a project logger with automatic configuration and root detection.
     """
     
-    # 1. Determinamos la raíz real del proyecto de forma blindada
+    # 1. Resolve the actual project root.
     project_root = get_project_root()
     
-    # 2. Cargamos la configuración desde la raíz
+    # 2. Load the configuration from the project root.
     config_path = project_root / "config" / "config.yaml"
     
     try:
@@ -37,17 +36,17 @@ def setup_logger(logger_name: str, log_filename: str) -> logging.Logger:
             config = yaml.safe_load(f)
         log_cfg = config.get("logger", {})
     except Exception:
-        # Valores de emergencia si el YAML no existe o falla
+        # Safe fallback values if the YAML file is missing or invalid.
         log_cfg = {}
 
-    # 3. Extraemos la configuración (con valores por defecto seguros)
+    # 3. Extract configuration with safe defaults.
     log_folder = log_cfg.get("log_folder", "LOGS")
     console_level_name = log_cfg.get("log_console_level", "INFO")
     file_level_name = log_cfg.get("log_file_level", "DEBUG")
     console_format = log_cfg.get("log_console_format", "%(asctime)s - %(levelname)s - %(message)s")
     file_format = log_cfg.get("log_file_format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     
-    # Forzamos que sean números enteros para evitar errores si en el YAML hay texto
+    # Force integer values to avoid type issues from misconfigured YAML entries.
     try:
         max_bytes = int(log_cfg.get("log_max_bytes", 5242880))
         backup_count = int(log_cfg.get("log_backup_count", 3))
@@ -55,7 +54,7 @@ def setup_logger(logger_name: str, log_filename: str) -> logging.Logger:
         max_bytes = 5242880
         backup_count = 3
 
-    # 4. Mapeamos los textos del YAML a las constantes reales de logging
+    # 4. Map YAML level names to logging constants.
     level_map = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -67,20 +66,20 @@ def setup_logger(logger_name: str, log_filename: str) -> logging.Logger:
     console_level = level_map.get(str(console_level_name).upper(), logging.INFO)
     file_level = level_map.get(str(file_level_name).upper(), logging.DEBUG)
 
-    # 5. CREACIÓN DE LA CARPETA (Garantizado en la raíz)
+    # 5. Create the log directory at the project root.
     full_log_path = project_root / log_folder
     os.makedirs(full_log_path, exist_ok=True)
 
-    # 6. Configuración Core del Logger
+    # 6. Configure the core logger.
     logger = logging.getLogger(logger_name)
-    logger.setLevel(logging.DEBUG)  # Nivel maestro siempre en DEBUG para que pase todo
+    logger.setLevel(logging.DEBUG)  # Keep the master level at DEBUG so all records pass through.
 
-    # Evitamos duplicar mensajes si la función se llama varias veces
+    # Avoid duplicate handlers if setup_logger is called multiple times.
     if not logger.handlers:
         file_formatter = logging.Formatter(file_format)
         console_formatter = logging.Formatter(console_format)
 
-        # --- FILE HANDLER (El que guarda en la carpeta LOGS) ---
+        # --- File handler: persists logs under the configured log directory. ---
         file_dest = full_log_path / log_filename
         file_handler = RotatingFileHandler(
             file_dest, 
@@ -90,7 +89,7 @@ def setup_logger(logger_name: str, log_filename: str) -> logging.Logger:
         file_handler.setFormatter(file_formatter)
         file_handler.setLevel(file_level)
 
-        # --- CONSOLE HANDLER (El que imprime en la pantalla) ---
+        # --- Console handler: prints logs to the active terminal. ---
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(console_level)

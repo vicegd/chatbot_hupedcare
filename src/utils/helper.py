@@ -1,13 +1,12 @@
-from dotenv import load_dotenv
-import os, re, base64, json, yaml
+import base64
+import json
+import os
+import re
+import yaml
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 import PyPDF2
 from docx import Document
-from openai import OpenAI
-from docx import Document
-import os
-import json
-import base64
 from openai import OpenAI
 
 # Initialization
@@ -19,20 +18,20 @@ def load_config():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(base_dir, '..', '..'))
     config_path = os.path.join(project_root, 'config', 'config.yaml')
-    with open(config_path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)
+    with open(config_path, 'r', encoding='utf-8') as file_handle:
+        return yaml.safe_load(file_handle)
     
 def load_metadata():
-    METADATA_FILE = os.path.join(config['storage']['data_folder'], ".metadata.json")
-    if os.path.exists(METADATA_FILE):
-        with open(METADATA_FILE, "r") as f:
-            return json.load(f)
+    metadata_file_path = os.path.join(config['storage']['data_folder'], ".metadata.json")
+    if os.path.exists(metadata_file_path):
+        with open(metadata_file_path, "r") as file_handle:
+            return json.load(file_handle)
     return {}
 
 def save_metadata(metadata):
-    METADATA_FILE = os.path.join(config['storage']['data_folder'], ".metadata.json")
-    with open(METADATA_FILE, "w") as f:
-        json.dump(metadata, f, indent=4)
+    metadata_file_path = os.path.join(config['storage']['data_folder'], ".metadata.json")
+    with open(metadata_file_path, "w") as file_handle:
+        json.dump(metadata, file_handle, indent=4)
 
 load_dotenv()
 config = load_config()
@@ -40,13 +39,13 @@ config['storage']['data_folder'] = os.path.join(project_root, 'DATA')
 metadata = load_metadata()
 client = OpenAI(base_url=config['ai']['base_url'], api_key=os.getenv("MODEL_API_KEY"))
 
-def extract_clean_text(text):
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
+def extract_clean_text(raw_text):
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
     return "\n".join(lines)
 
 def extract_from_html_or_php(file_path):
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as file_handle:
+        content = file_handle.read()
     content = re.sub(r'<\?php.*?\?>', '', content, flags=re.DOTALL | re.IGNORECASE)
     soup = BeautifulSoup(content, 'html.parser')
     for tag in soup(["script", "style", "header", "footer", "nav", "aside"]):
@@ -54,14 +53,14 @@ def extract_from_html_or_php(file_path):
     return extract_clean_text(soup.get_text(separator=' '))
 
 def extract_from_pdf(file_path):
-    text = ""
+    extracted_text = ""
     try:
-        with open(file_path, "rb") as f:
-            reader = PyPDF2.PdfReader(f)
+        with open(file_path, "rb") as file_handle:
+            reader = PyPDF2.PdfReader(file_handle)
             for page in reader.pages:
-                text += page.extract_text() + "\n"
+                extracted_text += page.extract_text() + "\n"
     except Exception as e: print(f"PDF Error: {e}")
-    return extract_clean_text(text)
+    return extract_clean_text(extracted_text)
 
 def extract_description_from_image_with_ai(image_path):
     try:
@@ -114,23 +113,22 @@ def extract_from_doc(file_path):
     Zero-dependency extractor for legacy .doc files.
     """
     try:
-        with open(file_path, 'rb') as f:
-            content = f.read()
+        with open(file_path, 'rb') as file_handle:
+            content = file_handle.read()
 
-        #1. Extract ASCII strings (sequences of 4+ printable characters)
+        # 1. Extract ASCII strings (sequences of 4+ printable characters).
         ascii_text = re.findall(rb'[\x20-\x7E]{4,}', content)
         decoded_ascii = " ".join([s.decode('ascii', errors='ignore') for s in ascii_text])
 
-        #2. Extract UTF-16LE strings (Common in modern .doc for special chars/accents)
-        #We look for patterns of [char][null] which is how UTF-16LE stores simple text
+        # 2. Extract UTF-16LE strings, which are common in modern .doc files.
+        # Look for [char][null] patterns, the usual UTF-16LE layout for simple text.
         utf16_text = re.findall(rb'(?:[\x20-\x7E]\x00){4,}', content)
         decoded_utf16 = " ".join([s.decode('utf-16le', errors='ignore') for s in utf16_text])
 
-        #Combine both extractions
+        # Combine both extraction strategies.
         combined_text = decoded_ascii + " " + decoded_utf16
         
-        #3. Clean up typical Word binary "noise" (metadata, internal tags)
-        #This removes common strings like 'Microsoft Word', 'Normal.dotm', etc.
+        # 3. Remove typical Word binary noise such as metadata and internal tags.
         noise_patterns = [
             r'Microsoft\sWord', r'Normal\.dotm', r'Title', r'Subject', 
             r'Author', r'Keywords', r'Comments'
@@ -138,7 +136,7 @@ def extract_from_doc(file_path):
         for pattern in noise_patterns:
             combined_text = re.sub(pattern, '', combined_text, flags=re.I)
 
-        #Use the existing cleaning helper
+        # Reuse the common text cleanup helper.
         return extract_clean_text(combined_text)
 
     except Exception as e:

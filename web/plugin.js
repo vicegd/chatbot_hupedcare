@@ -1,11 +1,11 @@
-// Plugin del chatbot profesional con internacionalización
+// Professional chatbot plugin with internationalization support.
 
-// Detectar idioma del navegador
-const userLang = navigator.language.split('-')[0];
-const supportedLangs = ['es', 'en', 'pt', 'tr', 'pl'];
-const currentLang = supportedLangs.includes(userLang) ? userLang : 'en';
+// Detect the browser language.
+const browserLanguage = navigator.language.split('-')[0];
+const supportedLanguages = ['es', 'en', 'pt', 'tr', 'pl'];
+const currentLanguage = supportedLanguages.includes(browserLanguage) ? browserLanguage : 'en';
 
-// Traducciones
+// UI translations.
 const translations = {
     es: {
         header: "Asistente Virtual",
@@ -50,31 +50,31 @@ const translations = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Crear elementos del chatbot
-    const button = document.createElement('button');
-    button.id = 'chatbot-button';
-    button.innerHTML = `
+    // Create the chatbot elements.
+    const toggleButton = document.createElement('button');
+    toggleButton.id = 'chatbot-button';
+    toggleButton.innerHTML = `
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H5.17L4 17.17V4H20V16Z" fill="white"/>
             <path d="M7 9H17V11H7V9ZM7 12H15V14H7V12Z" fill="white"/>
         </svg>
     `;
-    document.body.appendChild(button);
+    document.body.appendChild(toggleButton);
 
-    const window = document.createElement('div');
-    window.id = 'chatbot-window';
-    window.innerHTML = `
+    const chatWindow = document.createElement('div');
+    chatWindow.id = 'chatbot-window';
+    chatWindow.innerHTML = `
         <div id="chatbot-header">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
                 <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V11H13V17ZM13 9H11V7H13V9Z" fill="white"/>
             </svg>
-            ${translations[currentLang].header}
+            ${translations[currentLanguage].header}
         </div>
         <div id="chatbot-messages">
-            <div class="message bot">${translations[currentLang].welcome}</div>
+            <div class="message bot">${translations[currentLanguage].welcome}</div>
         </div>
         <div id="chatbot-input-area">
-            <input type="text" id="chatbot-input" placeholder="${translations[currentLang].placeholder}">
+            <input type="text" id="chatbot-input" placeholder="${translations[currentLanguage].placeholder}">
             <button id="chatbot-send">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M2.01 21L23 12 2.01 3 2 10L17 12 2 14L2.01 21Z" fill="white"/>
@@ -82,22 +82,22 @@ document.addEventListener('DOMContentLoaded', function() {
             </button>
         </div>
     `;
-    document.body.appendChild(window);
+    document.body.appendChild(chatWindow);
 
-    // Funcionalidad
-    const messages = document.getElementById('chatbot-messages');
-    const input = document.getElementById('chatbot-input');
-    const send = document.getElementById('chatbot-send');
+    // Wire up the interactive behavior.
+    const messagesContainer = document.getElementById('chatbot-messages');
+    const messageInput = document.getElementById('chatbot-input');
+    const sendButton = document.getElementById('chatbot-send');
 
-    button.addEventListener('click', function() {
-        if (window.style.display === 'flex') {
-            window.style.animation = 'slideDown 0.3s ease-in';
+    toggleButton.addEventListener('click', function() {
+        if (chatWindow.style.display === 'flex') {
+            chatWindow.style.animation = 'slideDown 0.3s ease-in';
             setTimeout(() => {
-                window.style.display = 'none';
+                chatWindow.style.display = 'none';
             }, 300);
         } else {
-            window.style.display = 'flex';
-            window.style.animation = 'slideUp 0.3s ease-out';
+            chatWindow.style.display = 'flex';
+            chatWindow.style.animation = 'slideUp 0.3s ease-out';
         }
     });
 
@@ -108,10 +108,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (i < text.length) {
                 element.innerHTML += text.charAt(i);
                 i++;
-                messages.scrollTop = messages.scrollHeight; // Scroll automático
+                messagesContainer.scrollTop = messagesContainer.scrollHeight; // Keep the latest message visible.
                 setTimeout(type, speed);
             } else {
-                // Aplicar cursiva a fuentes después de completar el typing
+                // Italicize source markers after the typing animation finishes.
                 element.innerHTML = element.innerHTML.replace(/\((source:[^)]+)\)/gi, '<i>($1)</i>');
             }
         }
@@ -122,26 +122,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const msg = document.createElement('div');
         msg.className = 'message ' + sender;
         if (isTyping) {
-            msg.innerHTML = '<span class="typing">' + translations[currentLang].typing + '</span>';
+            msg.innerHTML = '<span class="typing">' + translations[currentLanguage].typing + '</span>';
             msg.id = 'typing-indicator';
         } else {
-            // Si no es typing, iniciar el efecto de escritura
-            messages.appendChild(msg);
+            // Start the typewriter effect for regular messages.
+            messagesContainer.appendChild(msg);
             typeWriter(msg, text);
-            return; // No hacer scroll aquí, se hará en typeWriter si necesario
+            return; // Scrolling is handled inside typeWriter when needed.
         }
-        messages.appendChild(msg);
-        messages.scrollTop = messages.scrollHeight;
+        messagesContainer.appendChild(msg);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
         return msg;
     }
 
     function sendMessage() {
-        const question = input.value.trim();
+        const question = messageInput.value.trim();
         if (question) {
             addMessage(question, 'user');
-            input.value = '';
+            messageInput.value = '';
 
-            // Enviar al servidor
+            // Send the request to the backend.
             fetch('http://156.35.98.76:8000/ask', {
                 method: 'POST',
                 headers: {
@@ -154,17 +154,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.response) {
                     addMessage(data.response, 'bot');
                 } else if (data.error) {
-                    addMessage(translations[currentLang].error + data.error, 'bot');
+                    addMessage(translations[currentLanguage].error + data.error, 'bot');
                 }
             })
             .catch(error => {
-                addMessage(translations[currentLang].connectionError, 'bot');
+                addMessage(translations[currentLanguage].connectionError, 'bot');
             });
         }
     }
 
-    send.addEventListener('click', sendMessage);
-    input.addEventListener('keypress', function(e) {
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             sendMessage();
         }

@@ -11,7 +11,7 @@ logger = logger.setup_logger(logger_name="vector_processor", log_filename="vecto
 
 def update_vector_db():
     config = helper.config
-    # 1. API Configuration (OpenAI Oficial)
+    # 1. API configuration.
     openai_ef = embedding_functions.OpenAIEmbeddingFunction(
         api_key=os.getenv("MODEL_API_KEY"),
         model_name=config['embeddings']['embedding_model']
@@ -30,16 +30,16 @@ def update_vector_db():
     )
     chunks = text_splitter.split_text(full_text)
 
-    # 4. ChromaDB Connection
+    # 4. ChromaDB connection.
     db_path = os.path.join(config['storage']['data_folder'], "vector_db")
-    client = chromadb.PersistentClient(path=db_path)
+    chroma_client = chromadb.PersistentClient(path=db_path)
     
-    if "rag_context" in [c.name for c in client.list_collections()]:
-        client.delete_collection(name="rag_context")
+    if "rag_context" in [collection.name for collection in chroma_client.list_collections()]:
+        chroma_client.delete_collection(name="rag_context")
     
-    collection = client.create_collection(name="rag_context", embedding_function=openai_ef)
+    collection = chroma_client.create_collection(name="rag_context", embedding_function=openai_ef)
 
-    # 5. Insert
+    # 5. Insert chunks into the collection.
     collection.add(
         documents=chunks,
         ids=[f"id_{i}" for i in range(len(chunks))]

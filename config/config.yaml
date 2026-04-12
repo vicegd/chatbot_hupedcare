@@ -1,4 +1,4 @@
-# Configuración del Motor de IA
+# AI engine configuration
 ai:
   base_url: "https://api.openai.com/v1"
   model: "gpt-4o-mini"
@@ -43,14 +43,14 @@ server:
 
 database:
   queries:
-    #Filtramos solo lo que está publicado y evitamos revisiones, borradores o menús.
+    # Limit records to published content and exclude revisions, drafts, and menus.
     - "SELECT post_title, post_content, post_type, post_date FROM wp_posts WHERE post_status = 'publish' AND post_type IN ('post', 'page')"
-    #Comentarios Aprobados (El "Feedback" de la comunidad)
-    #Excluimos pingbacks, trackbacks y spam. Muy útil si los usuarios hacen preguntas en tu web.
+    # Approved comments, which represent community feedback.
+    # Exclude pingbacks, trackbacks, and spam to keep the dataset relevant.
     - "SELECT comment_author, comment_content, comment_date FROM wp_comments WHERE comment_approved = '1' AND comment_type IN ('comment', '')"
-    #Autores y Usuarios (Contexto de autoridad)
-    #Ayuda a la IA a saber quiénes son los expertos que escriben en la plataforma.
+    # Authors and registered users provide authority context.
+    # This helps the assistant identify who the platform experts are.
     - "SELECT display_name, user_email, user_registered FROM wp_users"
-    #Categorías y Etiquetas (Estructura temática)
-    #Extrae el nombre y la descripción de las categorías que tienen al menos un post.
+    # Categories and tags describe the thematic structure.
+    # Extract the name and description of categories or tags with at least one post.
     - "SELECT t.name AS term_name, tt.taxonomy, tt.description FROM wp_terms t INNER JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id WHERE tt.count > 0"
