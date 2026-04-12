@@ -1,0 +1,23 @@
+services:
+  api:
+    build: .
+    container_name: hupedcare-chatbot-api
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  collector:
+    build: .
+    container_name: hupedcare-chatbot-collector
+    env_file:
+      - .env
+    command: ["python", "src/collector.py"]
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    profiles: ["collector"]

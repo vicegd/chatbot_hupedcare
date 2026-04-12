@@ -1,5 +1,7 @@
 # HUPEDCARE Chatbot
 
+[![CI](https://github.com/vicegd/chatbot_hupedcare/actions/workflows/ci.yml/badge.svg)](https://github.com/vicegd/chatbot_hupedcare/actions/workflows/ci.yml)
+
 This repository contains the current backend, ingestion pipeline, and web widget for the HUPEDCARE chatbot. The project follows a Retrieval-Augmented Generation (RAG) architecture: source content is collected and normalized into a master context, embedded into a vector database, and then queried by a FastAPI service that answers end-user questions.
 
 ## About HUPEDCARE
@@ -132,6 +134,17 @@ Once the server is running, you can verify service availability with:
 curl http://127.0.0.1:8000/health
 ```
 
+### Readiness check endpoint
+
+For deployment probes, use the readiness endpoint:
+
+```bash
+curl http://127.0.0.1:8000/ready
+```
+
+This endpoint checks API key presence, vector database path availability, and
+`rag_context` collection access.
+
 ### Run the CLI client
 
 ```bash
@@ -156,14 +169,47 @@ Install development dependencies:
 pip install -r requirements-dev.txt
 ```
 
+Install pre-commit hooks:
+
+```bash
+pre-commit install
+```
+
 Run local quality checks before pushing:
 
 ```bash
 ruff check src tests
 pytest -q
+pre-commit run --all-files
 ```
 
 For contribution guidelines and pull-request expectations, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Docker
+
+Build the API image:
+
+```bash
+docker build -t hupedcare-chatbot:latest .
+```
+
+Run the API container:
+
+```bash
+docker run --rm -p 8000:8000 --env-file .env hupedcare-chatbot:latest
+```
+
+Optional compose workflow:
+
+```bash
+docker compose up --build
+```
+
+Run collector as a one-shot container with compose profile:
+
+```bash
+docker compose --profile collector run --rm collector
+```
 
 ## Deployment Guide
 

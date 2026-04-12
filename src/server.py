@@ -7,6 +7,7 @@ from chromadb.utils import embedding_functions
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from openai import OpenAI
 from pydantic import BaseModel
 
@@ -92,6 +93,33 @@ async def health_check():
     """Return lightweight service status for monitoring probes."""
     return {"status": "ok"}
 
+
+@app.get("/ready")
+async def readiness_check():
+    """Return readiness status after checking core runtime dependencies."""
+    checks = {
+        "model_api_key": bool(model_api_key),
+        "vector_db_path_exists": os.path.isdir(db_path),
+    }
+
+    try:
+        ready_collection = chroma_client.get_collection(
+            name="rag_context",
+            embedding_function=openai_ef,
+        )
+        checks["vector_collection_available"] = ready_collection is not None
+    except Exception as error:
+        logger.warning(f"Readiness check could not access rag_context collection: {error}")
+        checks["vector_collection_available"] = False
+
+    is_ready = all(checks.values())
+    status = "ready" if is_ready else "not_ready"
+
+    if is_ready:
+        return {"status": status, "checks": checks}
+
+    return JSONResponse(status_code=503, content={"status": status, "checks": checks})
+
 @app.post("/ask")
 async def answer_user(item: Query):
     """Answer a user question using retrieval-augmented generation.
@@ -173,9 +201,14 @@ def get_server_bind(config):
             port = parsed.port
             if port is None:
                 port = 443 if parsed.scheme == 'https' else 80
-            logger.debug(f"Server bind derived from public_url: host={parsed.hostname}, port={port}")
+            logger.debug(
+                f"Server bind derived from public_url: host={parsed.hostname}, port={port}"
+            )
             return parsed.hostname, port
-    logger.debug(f"Server bind derived from host/port config: host={config['server']['host']}, port={config['server']['port']}")
+    logger.debug(
+        "Server bind derived from host/port config: "
+        f"host={config['server']['host']}, port={config['server']['port']}"
+    )
     return config['server']['host'], config['server']['port']
 
 # 7. EXECUTION ENTRY POINT
