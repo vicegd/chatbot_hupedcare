@@ -1,13 +1,12 @@
 import requests
-from colorama import Fore, Style, init
-
+import colorama
 import utils.logger as logger
 from utils.helper import load_config
 
 logger = logger.setup_logger(logger_name="api_client", log_filename="client.log")
 
 # Initialize colorama (autoreset=True makes colors only apply to the current print)
-init(autoreset=True)
+colorama.init(autoreset=True)
 
 def chat():
     """Run the interactive command-line client for the chatbot API.
@@ -22,21 +21,21 @@ def chat():
     logger.debug(f"Client configured to use endpoint: {url}")
     
     # Route the CLI banner through the logger so all console output follows the same path.
-    logger.info(Style.BRIGHT + Fore.CYAN + "=" * 50)
-    logger.info(Style.BRIGHT + Fore.CYAN + "       HUPEDCARE CHATBOT - RESEARCH ASSISTANT")
-    logger.info(Style.BRIGHT + Fore.CYAN + "=" * 50)
-    logger.info(f"Connected to: {Fore.YELLOW}{url}")
-    logger.info(f"Type {Fore.RED}'exit'{Fore.RESET} to close the session.\n")
+    logger.info(colorama.Style.BRIGHT + colorama.Fore.CYAN + "=" * 50)
+    logger.info(colorama.Style.BRIGHT + colorama.Fore.CYAN + "       HUPEDCARE CHATBOT - RESEARCH ASSISTANT")
+    logger.info(colorama.Style.BRIGHT + colorama.Fore.CYAN + "=" * 50)
+    logger.info(f"Connected to: {colorama.Fore.YELLOW}{url}")
+    logger.info(f"Type {colorama.Fore.RED}'exit'{colorama.Fore.RESET} to close the session.\n")
     
     while True:
         try:
             # 1. USER INPUT (green color for user text)
-            question = input(Style.BRIGHT + Fore.GREEN + ">> ")
+            question = input(colorama.Style.BRIGHT + colorama.Fore.GREEN + ">> ")
             logger.debug(f"Received user input with length {len(question.strip())}")
 
             # Preserve the multilingual exit aliases already used by the CLI.
             if question.lower() in ["salir", "exit", "wyjść", "sair", "çıkmak", "quit"]:
-                logger.info(Fore.YELLOW + "Closing session... Goodbye!")
+                logger.info(colorama.Fore.YELLOW + "Closing session... Goodbye!")
                 break
             
             if not question.strip():
@@ -54,7 +53,7 @@ def chat():
                 answer = response.json()['response']
                 logger.debug(f"Received answer with length {len(answer)}")
                 # 3. AI RESPONSE (blue/cyan color for the assistant)
-                logger.info(Style.BRIGHT + Fore.BLUE + "<< " + Style.NORMAL + Fore.WHITE + answer + "\n")
+                logger.info(colorama.Style.BRIGHT + colorama.Fore.BLUE + "<< " + colorama.Style.NORMAL + colorama.Fore.WHITE + answer + "\n")
             else:
                 logger.error(f"Server error: {response.status_code}")
 

@@ -1,12 +1,11 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
-
+import pathlib
 import yaml
 
 
-def get_project_root() -> Path:
+def get_project_root() -> pathlib.Path:
     """
     Find the repository root used to resolve configuration and log paths.
 
@@ -15,7 +14,7 @@ def get_project_root() -> Path:
         `config/` or `requirements.txt`.
     """
     # Start from the directory that contains this file.
-    current_dir = Path(__file__).resolve().parent
+    current_dir = pathlib.Path(__file__).resolve().parent
     
     # Check the current directory and the next three parents.
     for directory in [current_dir, current_dir.parent, current_dir.parent.parent, current_dir.parent.parent.parent]:
