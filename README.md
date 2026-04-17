@@ -1,7 +1,5 @@
 # HUPEDCARE Chatbot
 
-[![CI](https://github.com/vicegd/chatbot_hupedcare/actions/workflows/ci.yml/badge.svg)](https://github.com/vicegd/chatbot_hupedcare/actions/workflows/ci.yml)
-
 This repository contains the current backend, ingestion pipeline, and web widget for the HUPEDCARE chatbot. The project follows a Retrieval-Augmented Generation (RAG) architecture: source content is collected and normalized into a master context, embedded into a vector database, and then queried by a FastAPI service that answers end-user questions.
 
 ## About HUPEDCARE
@@ -91,9 +89,7 @@ The system is split into four runtime areas:
 │   ├── plugin.css
 │   └── plugin.js
 ├── README.md
-├── requirements-dev.txt
-├── requirements.txt
-└── pyproject.toml
+└── requirements.txt
 ```
 
 ## Configuration
@@ -186,74 +182,6 @@ On Windows (cmd):
 ```bat
 scripts\export_mermaid.bat
 ```
-
-## Development and CI
-
-This repository includes:
-
-- GitHub Actions workflow: [.github/workflows/ci.yml](.github/workflows/ci.yml)
-- Release workflow: [.github/workflows/release.yml](.github/workflows/release.yml)
-- Ruff lint configuration: [pyproject.toml](pyproject.toml)
-- Smoke tests: [tests](tests)
-
-Install development dependencies:
-
-```bash
-pip install -r requirements-dev.txt
-```
-
-Install pre-commit hooks:
-
-```bash
-pre-commit install
-```
-
-Run local quality checks before pushing:
-
-```bash
-ruff check src tests
-pytest -q
-pre-commit run --all-files
-```
-
-Create a GitHub release by pushing a tag like `v1.0.0`.
-
-For contribution guidelines and pull-request expectations, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Docker
-
-Build the API image:
-
-```bash
-docker build -t hupedcare-chatbot:latest .
-```
-
-Run the API container:
-
-```bash
-docker run --rm -p 8000:8000 --env-file .env hupedcare-chatbot:latest
-```
-
-Optional compose workflow:
-
-```bash
-docker compose up --build
-```
-
-Run only the API service with compose:
-
-```bash
-docker compose up --build api
-```
-
-Run collector as a one-shot container with compose profile:
-
-```bash
-docker compose --profile collector run --rm collector
-```
-
-This uses the `collector` profile in [docker-compose.yml](docker-compose.yml) and
-mounts `data/` and `logs/` as persistent volumes.
 
 ## Git Hygiene
 

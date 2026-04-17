@@ -5,38 +5,28 @@ Thanks for contributing to the HUPEDCARE chatbot project.
 ## Development Setup
 
 1. Create and activate a virtual environment.
-2. Install runtime and development dependencies:
+2. Install runtime dependencies:
 
 ```bash
 pip install -r requirements.txt
-pip install -r requirements-dev.txt
-```
-
-## Local Quality Checks
-
-Run these checks before opening a pull request:
-
-```bash
-ruff check src tests
-pytest -q
 ```
 
 ## Branch and Commit Recommendations
 
 - Use short topic branches (for example `feat/retrieval-metrics` or `fix/sql-timeout`).
 - Prefer focused commits with clear messages.
-- Keep each pull request scoped to one logical change.
+- Keep each change scoped to one logical objective.
 
-## Pull Request Checklist
+## Change Checklist
 
-- [ ] Code builds and tests pass locally.
-- [ ] Lint checks pass.
+- [ ] The API starts locally (`python src/server.py`).
+- [ ] The ingestion pipeline runs locally (`python src/collector.py`).
 - [ ] Documentation is updated when behavior changes.
 - [ ] Config changes are reflected in `README.md`.
 
 ## Reporting Bugs
 
-Please use the bug report template and include:
+Please include:
 
 - Expected behavior
 - Actual behavior
