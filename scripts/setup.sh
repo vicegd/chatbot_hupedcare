@@ -10,10 +10,10 @@ cd "$(dirname "$0")/.." || exit
 
 # Check if the virtual environment directory does NOT exist
 if [ ! -d ".venv" ]; then
-    echo "[1/3] Creating virtual environment (.venv)..."
+    echo "[1/3] Creating virtual environment .venv..."
     python3 -m venv .venv
 else
-    echo "[1/3] Virtual environment already exists. Skipping creation..."
+    echo "[1/3] Virtual environment already exists. Skipping creation."
 fi
 
 echo "[2/3] Activating the environment..."
