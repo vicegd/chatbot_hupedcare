@@ -14,7 +14,7 @@ This software is part of the HUPEDCARE initiative and is intended to support its
 The system is split into four main runtime areas:
 
 - Data ingestion: [src/collector.py](src/collector.py) orchestrates file processing, SQL export, master context generation, and vector database refresh.
-- API server: [src/server.py](src/server.py) serves the `/ask` endpoint and combines retrieved context with the system prompt before calling the chat model.
+- API server: [src/server.py](src/server.py) serves, among others, the `/ask` endpoint and combines retrieved context with the system prompt before calling the chat model.
 - Shared utilities: [src/utils](src/utils) contains extractors, logging setup, SQL and FTP collectors, and vector indexing helpers.
 - Frontend widget: [web/plugin.js](web/plugin.js) injects the floating chat UI into any host page and sends user questions to the backend.
 
@@ -39,7 +39,7 @@ The system is split into four main runtime areas:
 
 - [src/utils/helper.py](src/utils/helper.py): config loading, metadata persistence, and text extraction helpers for HTML, PDF, image, audio, DOCX, and DOC files.
 - [src/utils/ftp_collector.py](src/utils/ftp_collector.py): FTP synchronization with timestamp-based incremental download logic.
-- [src/utils/sql_collector.py](src/utils/sql_collector.py): SQL extraction and normalization for WordPress-oriented records.
+- [src/utils/sql_collector.py](src/utils/sql_collector.py): SQL extraction and normalization for SQL tables.
 - [src/utils/vector_processor.py](src/utils/vector_processor.py): chunking and ChromaDB indexing.
 - [src/utils/logger.py](src/utils/logger.py): shared rotating file and console logger setup.
 
@@ -58,12 +58,9 @@ The system is split into four main runtime areas:
 ├── data/
 │   ├── CACHE_TEXT/
 │   ├── TEMP_DOWNLOADS/
+│   ├── .metadata.json
 │   ├── master_context.txt
 │   └── vector_db/
-├── docs/
-│   ├── main.tex
-│   ├── references.bib
-│   └── images/
 ├── logs/
 ├── scripts/
 │   ├── export_mermaid.bat
@@ -88,6 +85,9 @@ The system is split into four main runtime areas:
 │   ├── index.html
 │   ├── plugin.css
 │   └── plugin.js
+├── .env.structure
+├── .gitignore
+├── LICENSE
 ├── README.md
 └── requirements.txt
 ```
@@ -205,7 +205,7 @@ git commit -m "chore: untrack runtime artifacts"
 
 ### Required environment variables
 
-Create a `.env` file (or equivalent secrets configuration in your deployment platform) and define at least the following variables:
+Rename the `.env.structure` file to `.env` file (or equivalent secrets configuration in your deployment platform) and define at least the following variables:
 
 - `MODEL_API_KEY`: API key for the language and embedding provider.
 - `FTP_HOST`: FTP server hostname.
