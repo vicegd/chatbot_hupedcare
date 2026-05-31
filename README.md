@@ -4,7 +4,7 @@ This repository contains the current backend, ingestion pipeline, and web widget
 
 ## About HUPEDCARE
 
-This software is part of the HUPEDCARE initiative and is intended to support its digital assistant and knowledge services.
+This software is part of the HUPEDCARE project and is intended to support its digital assistant and knowledge services.
 
 - Main website: https://hupedcare.com
 - Project platform: https://project.hupedcare.com
