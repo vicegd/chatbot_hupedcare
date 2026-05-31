@@ -11,7 +11,7 @@ This software is part of the HUPEDCARE initiative and is intended to support its
 
 ## Architecture
 
-The system is split into four runtime areas:
+The system is split into four main runtime areas:
 
 - Data ingestion: [src/collector.py](src/collector.py) orchestrates file processing, SQL export, master context generation, and vector database refresh.
 - API server: [src/server.py](src/server.py) serves the `/ask` endpoint and combines retrieved context with the system prompt before calling the chat model.

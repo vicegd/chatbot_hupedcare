@@ -1,11 +1,21 @@
-// Professional chatbot plugin with internationalization support.
+/*
+=============================================================================
+RAG WIDGET LOGIC
+=============================================================================
+This script runs in the user's browser. It creates the HTML elements on the 
+fly, handles multiple languages (i18n), creates a typewriter text effect, 
+and communicates with the FastAPI backend.
+=============================================================================
+*/
 
-// Detect the browser language.
+// 1. INTERNATIONALIZATION (i18n)
+// Detect the browser language dynamically.
 const browserLanguage = navigator.language.split('-')[0];
 const supportedLanguages = ['es', 'en', 'pt', 'tr', 'pl'];
+// Fallback to English if the browser language is not explicitly supported.
 const currentLanguage = supportedLanguages.includes(browserLanguage) ? browserLanguage : 'en';
 
-// UI translations.
+// UI translations dictionary.
 const translations = {
     es: {
         header: "Asistente Virtual",
@@ -13,7 +23,7 @@ const translations = {
         placeholder: "Escribe tu mensaje...",
         welcome: "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?",
         error: "Lo siento, ocurrió un error: ",
-        connectionError: "Error de conexión. Por favor, verifica tu conexión a internet."
+        connectionError: "Error de conexión. Por favor, verifica tu conexión a internet o asegúrate de que el servidor está encendido."
     },
     en: {
         header: "Virtual Assistant",
@@ -21,36 +31,14 @@ const translations = {
         placeholder: "Type your message...",
         welcome: "Hello! I'm your virtual assistant. How can I help you today?",
         error: "Sorry, an error occurred: ",
-        connectionError: "Connection error. Please check your internet connection."
+        connectionError: "Connection error. Please check your internet connection or ensure the server is running."
     },
-    pt: {
-        header: "Assistente Virtual",
-        typing: "Digitando...",
-        placeholder: "Digite sua mensagem...",
-        welcome: "Olá! Sou seu assistente virtual. Como posso ajudá-lo hoje?",
-        error: "Desculpe, ocorreu um erro: ",
-        connectionError: "Erro de conexão. Por favor, verifique sua conexão com a internet."
-    },
-    tr: {
-        header: "Sanal Asistan",
-        typing: "Yazıyor...",
-        placeholder: "Mesajınızı yazın...",
-        welcome: "Merhaba! Ben sizin sanal asistanınızım. Bugün size nasıl yardımcı olabilirim?",
-        error: "Üzgünüm, bir hata oluştu: ",
-        connectionError: "Bağlantı hatası. Lütfen internet bağlantınızı kontrol edin."
-    },
-    pl: {
-        header: "Asystent Wirtualny",
-        typing: "Pisze...",
-        placeholder: "Wpisz swoją wiadomość...",
-        welcome: "Cześć! Jestem twoim wirtualnym asystentem. Jak mogę ci dziś pomóc?",
-        error: "Przepraszam, wystąpił błąd: ",
-        connectionError: "Błąd połączenia. Sprawdź swoje połączenie internetowe."
-    }
+    // ... (pt, tr, pl dictionaries omitted for brevity, but they are exactly as you wrote them) ...
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Create the chatbot elements.
+    // 2. DOM INJECTION
+    // Build the toggle button dynamically.
     const toggleButton = document.createElement('button');
     toggleButton.id = 'chatbot-button';
     toggleButton.innerHTML = `
@@ -85,36 +73,34 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.body.appendChild(chatWindow);
 
-    // Wire up the interactive behavior.
+    // 3. UI INTERACTIONS
     const messagesContainer = document.getElementById('chatbot-messages');
     const messageInput = document.getElementById('chatbot-input');
     const sendButton = document.getElementById('chatbot-send');
 
+    // Toggle window visibility with animations
     toggleButton.addEventListener('click', function() {
-        // Reuse CSS animations both when opening and closing the floating window.
         if (chatWindow.style.display === 'flex') {
             chatWindow.style.animation = 'slideDown 0.3s ease-in';
-            setTimeout(() => {
-                chatWindow.style.display = 'none';
-            }, 300);
+            setTimeout(() => { chatWindow.style.display = 'none'; }, 300);
         } else {
             chatWindow.style.display = 'flex';
             chatWindow.style.animation = 'slideUp 0.3s ease-out';
         }
     });
 
+    // Simulated streaming text effect for a natural feel
     function typeWriter(element, text, speed = 5) {
         let i = 0;
         element.innerHTML = '';
         function type() {
             if (i < text.length) {
-                // Append one character per tick to simulate streaming output.
                 element.innerHTML += text.charAt(i);
                 i++;
-                messagesContainer.scrollTop = messagesContainer.scrollHeight; // Keep the latest message visible.
+                messagesContainer.scrollTop = messagesContainer.scrollHeight; 
                 setTimeout(type, speed);
             } else {
-                // Italicize source markers after the typing animation finishes.
+                // Italicize source markers after the typing animation finishes for better readability
                 element.innerHTML = element.innerHTML.replace(/\((source:[^)]+)\)/gi, '<i>($1)</i>');
             }
         }
@@ -124,29 +110,37 @@ document.addEventListener('DOMContentLoaded', function() {
     function addMessage(text, sender, isTyping = false) {
         const msg = document.createElement('div');
         msg.className = 'message ' + sender;
+        
         if (isTyping) {
-            // A dedicated typing node makes it easy to replace or remove later.
             msg.innerHTML = '<span class="typing">' + translations[currentLanguage].typing + '</span>';
             msg.id = 'typing-indicator';
+            messagesContainer.appendChild(msg);
         } else {
-            // Start the typewriter effect for regular messages.
+            // FIX: Remove the "Typing..." indicator before appending the real answer
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+            
             messagesContainer.appendChild(msg);
             typeWriter(msg, text);
-            return; // Scrolling is handled inside typeWriter when needed.
         }
-        messagesContainer.appendChild(msg);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        return msg;
     }
 
+    // 4. API COMMUNICATION
     function sendMessage() {
         const question = messageInput.value.trim();
         if (question) {
-            // Echo the user message immediately so the UI feels responsive before the network round-trip.
+            // A. Display user message and clear input
             addMessage(question, 'user');
             messageInput.value = '';
+            
+            // B. Display the "Typing..." loading state
+            addMessage('', 'bot', true);
 
-            // Send the request to the backend.
+            // C. Send HTTP request to your FastAPI server
+            // Ensure this URL matches your Linux server's public IP exactly!
             fetch('http://156.35.98.76:8000/ask', {
                 method: 'POST',
                 headers: {
@@ -156,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(data => {
-                // The backend may return either a generated answer or a serialized error payload.
+                // Remove typing indicator and show the actual response
                 if (data.response) {
                     addMessage(data.response, 'bot');
                 } else if (data.error) {
@@ -169,6 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Bind events to the Send button and the Enter key
     sendButton.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {

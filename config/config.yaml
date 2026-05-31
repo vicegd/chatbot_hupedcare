@@ -103,10 +103,10 @@ storage:
 # API host settings and CORS policy for browser-based clients.
 # ============================================================================
 server:
-  # Previous external URL kept for reference.
+  host: "0.0.0.0"
+  port: 8000
+  # External URL used by clients to access the API. In production, set this to the server's public IP or domain.
   # public_url: "http://156.35.98.76:8000"
-
-  # Main server URL used by clients and by bind-resolution logic.
   public_url: "http://127.0.0.1:8000"
 
   # Explicit CORS allowlist for production frontend origins.
