@@ -11,7 +11,7 @@ ai:
   base_url: "https://api.openai.com/v1"
 
   # Main chat model used to generate final answers in the API server.
-  model: "gpt-4o-mini"
+  model: "gpt-4o-mini-2024-07-18"
 
   # Core behavior policy injected as the system message for every answer.
   # This prompt enforces retrieval-first behavior and source attribution.
@@ -29,7 +29,7 @@ ai:
   transcription_model: "whisper-1"
 
   # Vision-capable model used to describe images for RAG indexing.
-  vision_model: "gpt-4o-mini"
+  vision_model: "gpt-4o-mini-2024-07-18"
 
 
 # ============================================================================
