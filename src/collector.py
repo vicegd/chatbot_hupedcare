@@ -29,12 +29,28 @@ How the pipeline works (Step-by-Step):
 import hashlib
 import os
 
+from core.events import EventBus
+from core.extraction_strategies import build_default_registry
 import utils.helper as helper
 import utils.logger as logger
 import utils.sql_collector as sql_collector
 
 # Initialize the logger for this specific module
 logger = logger.setup_logger(logger_name="data_collector", log_filename="collector.log")
+
+
+class LoggerObserver:
+    """Observer that writes high-level ETL events to the application logger."""
+
+    def __init__(self, log):
+        self._log = log
+
+    def on_event(self, event):
+        details = " ".join(f"{key}={value}" for key, value in event.payload.items())
+        if details:
+            self._log.info(f"[EVENT] {event.name} {details}")
+        else:
+            self._log.info(f"[EVENT] {event.name}")
 
 def get_file_hash(filepath):
     """
@@ -59,6 +75,9 @@ def run_collector():
     # Load configuration and metadata states globally managed by helper.py
     config = helper.config
     metadata = helper.metadata
+    strategy_registry = build_default_registry()
+    events = EventBus()
+    events.subscribe(LoggerObserver(logger))
 
     # Define directories for raw downloaded files and their extracted text versions (cache)
     temp_downloads_dir = os.path.join(config['storage']['data_folder'], "TEMP_DOWNLOADS")
@@ -75,6 +94,7 @@ def run_collector():
     # This module would download raw files from a remote server to 'temp_downloads_dir'
     import utils.ftp_collector as ftp_collector
     updated_files, metadata = ftp_collector.sync_ftp_files(metadata, temp_downloads_dir)
+    events.publish("ftp_sync_completed", updated_files=len(updated_files))
 
     # ---------------------------------------------------------
     # 2. PURGE ORPHANED CACHE FILES
@@ -93,6 +113,7 @@ def run_collector():
         if cache_file_name not in expected_cache_files:
             logger.info(f"Cleanup: Removing {cache_file_name} (no longer on server)")
             os.remove(os.path.join(cache_text_dir, cache_file_name))
+            events.publish("orphan_cache_purged", cache_file=cache_file_name)
 
     # ---------------------------------------------------------
     # 3. PROCESS NEW OR MODIFIED FILES
@@ -109,32 +130,25 @@ def run_collector():
             # more recently than our cached text file.
             if not os.path.exists(cache_file_path) or os.path.getmtime(file_path) > os.path.getmtime(cache_file_path):
                 logger.info(f"  -> Processing: {relative_path}")
-                normalized_path = file_path.lower()
                 extracted_text = ""
                 
                 try:
-                    # Route the file to the correct AI or extraction tool based on its extension
-                    if normalized_path.endswith(('.html', '.htm', '.php')):
-                        extracted_text = helper.extract_from_html_or_php(file_path)
-                    elif normalized_path.endswith(('.jpg', '.png', '.jpeg', '.webp')):
-                        extracted_text = helper.extract_description_from_image_with_ai(file_path) # AI Vision Model
-                    elif normalized_path.endswith(('.mp3', '.wav', '.m4a', '.flac')):
-                        extracted_text = helper.extract_description_from_audio_with_ai(file_path) # AI Audio/Whisper
-                    elif normalized_path.endswith('.docx'):
-                        extracted_text = helper.extract_from_docx(file_path)
-                    elif normalized_path.endswith('.doc'):
-                        extracted_text = helper.extract_from_doc(file_path)
-                    elif normalized_path.endswith('.pdf'):
-                        extracted_text = helper.extract_from_pdf(file_path)
-                    elif normalized_path.endswith('.txt'):
-                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as file_handle:
-                            extracted_text = helper.extract_clean_text(file_handle.read())
+                    # Strategy-based extraction keeps modality logic open for extension.
+                    strategy = strategy_registry.resolve(file_path)
+                    if strategy is None:
+                        logger.debug(f"Skipping unsupported file type: {relative_path}")
+                        events.publish("unsupported_file_skipped", file=relative_path)
+                        continue
+
+                    extracted_text = strategy.extract(file_path)
+                    events.publish("file_extracted", file=relative_path)
                
                     # Save the extracted plain text to the cache directory
                     with open(cache_file_path, "w", encoding="utf-8") as file_handle:
                         file_handle.write(extracted_text if extracted_text.strip() else "No relevant content found.")
                 except Exception as e:
                     logger.exception(f"Error processing {file_name}: {e}")
+                    events.publish("file_extraction_failed", file=relative_path, error=str(e))
 
     # ---------------------------------------------------------
     # 4 & 5. ASSEMBLE MASTER CONTEXT & ADD SQL DATA
@@ -147,6 +161,7 @@ def run_collector():
     # Fetch structured data directly from the relational database
     sql_context = sql_collector.collect_sql_data(config)
     master_lines.append(sql_context)
+    events.publish("sql_context_collected")
 
     # ---------------------------------------------------------
     # 6. ADD CACHED FILES WITH SOURCE CITATION HEADERS
@@ -178,6 +193,7 @@ def run_collector():
     output_path = os.path.join(config['storage']['data_folder'], "master_context.txt")
     with open(output_path, "w", encoding="utf-8") as file_handle:
         file_handle.write("\n".join(master_lines))
+    events.publish("master_context_written", path=output_path)
     
     # Save the updated metadata state (managed by helper)
     helper.save_metadata(metadata)
@@ -195,6 +211,7 @@ def run_collector():
         if metadata.get("master_context_hash") == current_hash:
             logger.info("   -> [CACHE] No changes in master_context.txt.")
             logger.info("   -> [CACHE] Skipping Embedding API to save costs.")
+            events.publish("vector_update_skipped")
         else:
             # Only if the file has changed, we run the expensive embedding process
             logger.info("   -> [UPDATE] Changes detected! Sending data to Embedding Model...")
@@ -207,8 +224,10 @@ def run_collector():
             metadata["master_context_hash"] = current_hash
             helper.save_metadata(metadata)
             logger.info("   -> [SUCCESS] Vector database updated successfully.")
+            events.publish("vector_update_completed")
     else:
         logger.error("   -> [ERROR] master_context.txt not found!")
+        events.publish("master_context_missing")
 
 if __name__ == "__main__":
     logger.info("Starting collector...")
