@@ -1,285 +1,190 @@
 # HUPEDCARE Chatbot
 
-This repository contains the current backend, ingestion pipeline, and web widget for the HUPEDCARE chatbot. The project follows a Retrieval-Augmented Generation (RAG) architecture: source content is collected and normalized into a master context, embedded into a vector database, and then queried by a FastAPI service that answers end-user questions.
+HUPEDCARE Chatbot is a Retrieval-Augmented Generation (RAG) system that powers a digital assistant for the HUPEDCARE ecosystem.
+It includes:
 
-## About HUPEDCARE
+- a data ingestion pipeline that consolidates heterogeneous sources,
+- a vector indexing workflow backed by ChromaDB,
+- a FastAPI service that answers user questions through retrieval + generation,
+- and an embeddable web widget for host websites.
 
-This software is part of the HUPEDCARE project and is intended to support its digital assistant and knowledge services.
+Project websites:
 
-- Main website: https://hupedcare.com
-- Project platform: https://project.hupedcare.com
+- https://hupedcare.com
+- https://project.hupedcare.com
 
-## Architecture
+## What This Repository Contains
 
-The system is split into four main runtime areas:
-
-- Data ingestion: [src/collector.py](src/collector.py) orchestrates file processing, SQL export, master context generation, and vector database refresh.
-- API server: [src/server.py](src/server.py) serves, among others, the `/ask` endpoint and combines retrieved context with the system prompt before calling the chat model.
-- Shared utilities: [src/utils](src/utils) contains extractors, logging setup, SQL and FTP collectors, and vector indexing helpers.
-- Frontend widget: [web/plugin.js](web/plugin.js) injects the floating chat UI into any host page and sends user questions to the backend.
-
-## Runtime Flow
-
-1. Raw source files are mirrored into `data/TEMP_DOWNLOADS`.
-2. Extractors convert each supported file into plain text stored in `data/CACHE_TEXT`.
-3. SQL queries defined in [config/config.yaml](config/config.yaml) are executed and normalized into text blocks.
-4. The collector merges SQL output and cached file content into `data/master_context.txt`.
-5. When `master_context.txt` changes, [src/utils/vector_processor.py](src/utils/vector_processor.py) rebuilds the `rag_context` ChromaDB collection under `data/vector_db`.
-6. The API server retrieves the most relevant chunks for each question and sends them to the configured language model.
-
-## Source Map
-
-### Core entry points
-
-- [src/collector.py](src/collector.py): batch ingestion pipeline.
-- [src/server.py](src/server.py): FastAPI application and retrieval/generation logic.
-- [src/client.py](src/client.py): interactive command-line client for manual testing.
-
-### Utility modules
-
-- [src/utils/helper.py](src/utils/helper.py): config loading, metadata persistence, and text extraction helpers for HTML, PDF, image, audio, DOCX, and DOC files.
-- [src/utils/ftp_collector.py](src/utils/ftp_collector.py): FTP synchronization with timestamp-based incremental download logic.
-- [src/utils/sql_collector.py](src/utils/sql_collector.py): SQL extraction and normalization for SQL tables.
-- [src/utils/vector_processor.py](src/utils/vector_processor.py): chunking and ChromaDB indexing.
-- [src/utils/logger.py](src/utils/logger.py): shared rotating file and console logger setup.
-
-### Frontend files
-
-- [web/index.html](web/index.html): simple test page for the widget.
-- [web/plugin.js](web/plugin.js): embeddable multilingual chat widget.
+- [src/collector.py](src/collector.py): ingestion orchestrator (FTP/files + SQL + context assembly).
+- [src/server.py](src/server.py): FastAPI app exposing the chatbot API.
+- [src/client.py](src/client.py): terminal client for manual testing.
+- [src/utils](src/utils): shared utility modules (logging, extraction, SQL/FTP helpers, vector processing).
+- [web/plugin.js](web/plugin.js): multilingual floating chatbot widget.
 - [web/plugin.css](web/plugin.css): widget styling.
+- [web/index.html](web/index.html): simple widget test page.
+- [config/config.yaml](config/config.yaml): runtime configuration.
 
-## Repository Structure
+## End-to-End Runtime Flow
 
-```text
-.
-├── config/
-│   └── config.yaml
-├── data/
-│   ├── CACHE_TEXT/
-│   ├── TEMP_DOWNLOADS/
-│   ├── .metadata.json
-│   ├── master_context.txt
-│   └── vector_db/
-├── logs/
-├── scripts/
-│   ├── export_mermaid.bat
-│   ├── export_mermaid.sh
-│   ├── setup.bat
-│   ├── setup.sh
-│   ├── supervisor.bat
-│   ├── supervisor.sh
-│   ├── update_reqs.bat
-│   └── update_reqs.sh
-├── src/
-│   ├── client.py
-│   ├── collector.py
-│   ├── server.py
-│   └── utils/
-│       ├── ftp_collector.py
-│       ├── helper.py
-│       ├── logger.py
-│       ├── sql_collector.py
-│       └── vector_processor.py
-├── web/
-│   ├── index.html
-│   ├── plugin.css
-│   └── plugin.js
-├── .env.structure
-├── .gitignore
-├── LICENSE
-├── README.md
-└── requirements.txt
-```
+1. Source content is collected (FTP/local files + SQL query outputs).
+2. Content is normalized into plain text and merged into [data/master_context.txt](data/master_context.txt).
+3. The collector computes a hash of the assembled context.
+4. If the hash changed, [src/utils/vector_processor.py](src/utils/vector_processor.py) rebuilds the ChromaDB collection under [data/vector_db](data/vector_db).
+5. [src/server.py](src/server.py) retrieves top-k relevant chunks and sends them to the configured chat model.
+6. Clients consume the API through POST /ask.
 
-## Configuration
+## Requirements
 
-Main configuration lives in [config/config.yaml](config/config.yaml). The most important sections are:
+- Python 3 (recommended: modern 3.x runtime)
+- Network access to configured providers/services:
+	- model provider API,
+	- FTP server,
+	- MySQL server.
 
-- `ai`: model names, base URL, system prompt, vision model, and transcription model.
-- `embeddings`: embedding model, retrieval depth, chunk size, overlap, and temperature.
-- `server`: public URL, allowed origins, and bind information.
-- `database`: SQL queries used to enrich the knowledge base.
-- `logger`: file and console logging behavior.
-- `storage`: logical data folder used by the pipeline.
-
-The runtime also expects environment variables for model access and external systems such as FTP and MySQL.
-
-## Running the Project
-
-### Install dependencies
+Install Python dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Start the ingestion pipeline
+## Configuration
+
+### 1) Environment variables
+
+Create a local .env file from [.env.structure](.env.structure) and provide at least:
+
+- MODEL_API_KEY
+- FTP_HOST
+- FTP_USER
+- FTP_PASSWORD
+- FTP_REMOTE_PATH
+- DB_HOST
+- DB_USER
+- DB_PASSWORD
+- DB_NAME
+
+### 2) Application configuration
+
+Main runtime settings live in [config/config.yaml](config/config.yaml):
+
+- ai: chat model, vision/transcription models, system prompt, provider base URL.
+- embeddings: embedding model, top_k, chunking, temperature.
+- server: host/port, public_url, CORS allowlist/regex.
+- storage: data folder root.
+- database: SQL queries injected into the RAG corpus.
+- logger: rotation and verbosity settings.
+
+## Frontend Endpoint Configuration
+
+The widget endpoint is externalized from [web/plugin.js](web/plugin.js).
+
+1. Copy [web/chatbot-config.structure.js](web/chatbot-config.structure.js) to web/chatbot-config.js.
+2. Edit window.CHATBOT_CONFIG.apiUrl in web/chatbot-config.js.
+3. Keep web/chatbot-config.js local (it is ignored by [.gitignore](.gitignore)).
+
+Notes:
+
+- [web/index.html](web/index.html) loads chatbot-config.js before plugin.js.
+- Backend source-of-truth for public URL remains [config/config.yaml](config/config.yaml) server.public_url.
+- Keep both values aligned for each environment.
+
+## Local Run
+
+Run from repository root.
+
+### 1) Build/update corpus and vectors
 
 ```bash
 python src/collector.py
 ```
 
-### Start the API server
+### 2) Start API server
 
 ```bash
 python src/server.py
 ```
 
-### Health check endpoint
-
-Once the server is running, you can verify service availability with:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-### Readiness check endpoint
-
-For deployment probes, use the readiness endpoint:
-
-```bash
-curl http://127.0.0.1:8000/ready
-```
-
-This endpoint checks API key presence, vector database path availability, and
-`rag_context` collection access.
-
-### Metrics endpoint
-
-For lightweight observability, use:
-
-```bash
-curl http://127.0.0.1:8000/metrics
-```
-
-This endpoint exposes in-memory request counters and `/ask` latency statistics.
-
-### API endpoint summary
-
-- `POST /ask`: retrieval-augmented answer generation.
-- `GET /health`: liveness probe.
-- `GET /ready`: readiness probe with dependency checks.
-- `GET /metrics`: in-memory operational counters and latency aggregates.
-
-### Run the CLI client
+### 3) Optional terminal client
 
 ```bash
 python src/client.py
 ```
 
-### Use helper scripts
-
-The `scripts/` directory contains Windows and shell helpers for setup, supervision, dependency refresh, and Mermaid export.
-
-Export documentation diagrams manually:
+### 4) Health checks
 
 ```bash
-bash scripts/export_mermaid.sh
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/ready
+curl http://127.0.0.1:8000/metrics
 ```
 
-On Windows (cmd):
+## API Endpoints
 
-```bat
-scripts\export_mermaid.bat
-```
+- POST /ask: retrieval-augmented answer generation.
+- GET /health: liveness probe.
+- GET /ready: readiness probe (API key, vector DB path, collection availability).
+- GET /metrics: in-memory counters and latency aggregates.
 
-## Git Hygiene
+## Deployment Checklist
 
-Runtime artifacts are intentionally excluded from version control through
-[.gitignore](.gitignore), including:
+1. Configure production values in [config/config.yaml](config/config.yaml).
+2. Provide all required secrets as environment variables.
+3. Run one ingestion cycle before serving traffic.
+4. Start the API process with supervision/restart policy.
+5. Ensure persistent storage for data and logs.
+6. Restrict CORS origins to trusted domains only.
+7. Configure frontend endpoint via web/chatbot-config.js for the target environment.
 
-- local environments (`.venv/`, `venv/`)
-- secrets (`.env` and `.env.*`, except `.env.structure`)
-- runtime data and logs (`data/`, `logs/`, `temp/`, `*.log`)
-- caches and reports (`__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `.coverage*`, `htmlcov/`)
+## Operational Notes
 
-After changing ignore rules, remove previously tracked artifacts from index while keeping local files:
+- Ingestion is idempotent: vector rebuild runs only when master_context hash changes.
+- The API retrieves context dynamically to tolerate collection refresh windows.
+- Logging is centralized and supports rotation (see logger section in [config/config.yaml](config/config.yaml)).
 
-```bash
-git rm -r --cached data logs temp .venv venv
-git rm --cached .coverage
-git commit -m "chore: untrack runtime artifacts"
-```
+## Troubleshooting
 
-## Deployment Guide
+- 401/403 from model provider:
+	- Verify MODEL_API_KEY and ai.base_url.
+- Widget cannot connect:
+	- Check web/chatbot-config.js apiUrl and server CORS settings in [config/config.yaml](config/config.yaml).
+- Empty or weak answers:
+	- Run collector again and confirm [data/master_context.txt](data/master_context.txt) and [data/vector_db](data/vector_db) were updated.
+- Readiness fails:
+	- Check /ready response details, then validate vector DB path and rag_context collection state.
 
-### Required environment variables
+## Useful Scripts
 
-Rename the `.env.structure` file to `.env` file (or equivalent secrets configuration in your deployment platform) and define at least the following variables:
+Helper scripts are available in [scripts](scripts):
 
-- `MODEL_API_KEY`: API key for the language and embedding provider.
-- `FTP_HOST`: FTP server hostname.
-- `FTP_USER`: FTP username.
-- `FTP_PASSWORD`: FTP password.
-- `FTP_REMOTE_PATH`: Remote base directory for mirrored files (default is `/`).
-- `DB_HOST`: MySQL host.
-- `DB_USER`: MySQL user.
-- `DB_PASSWORD`: MySQL password.
-- `DB_NAME`: MySQL database name.
-
-Optional variables can be introduced according to your provider requirements, but the keys above cover the current ingestion and serving flow.
-
-### Production startup sequence
-
-1. Configure [config/config.yaml](config/config.yaml) with production values for `server`, `database`, `embeddings`, and `logger`.
-2. Ensure `storage.data_folder` points to a persistent path mounted in your runtime.
-3. Run one ingestion cycle before exposing the API:
-	- `python src/collector.py`
-4. Start the API service:
-	- `python src/server.py`
-5. Point the frontend widget URL in [web/plugin.js](web/plugin.js) to your public backend endpoint.
-
-### Recommended production practices
-
-- Run `src/collector.py` on a schedule (for example with cron, Task Scheduler, or your process supervisor) rather than continuously.
-- Keep `data/` and `logs/` on persistent storage.
-- Restrict CORS in `config.yaml` to trusted origins only.
-- Enable process supervision and automatic restarts for the API process.
-- Rotate and retain logs according to your compliance needs.
+- setup: [scripts/setup.sh](scripts/setup.sh), [scripts/setup.bat](scripts/setup.bat)
+- supervision: [scripts/supervisor.sh](scripts/supervisor.sh), [scripts/supervisor.bat](scripts/supervisor.bat)
+- requirements refresh: [scripts/update_reqs.sh](scripts/update_reqs.sh), [scripts/update_reqs.bat](scripts/update_reqs.bat)
+- mermaid export: [scripts/export_mermaid.sh](scripts/export_mermaid.sh), [scripts/export_mermaid.bat](scripts/export_mermaid.bat)
 
 ## Architecture Diagram
 
 ```mermaid
 flowchart TD
-	 A[FTP Server] --> B[src/utils/ftp_collector.py]
-	 C[MySQL Database] --> D[src/utils/sql_collector.py]
-	 E[Local Files in data/TEMP_DOWNLOADS] --> F[src/utils/helper.py]
+		A[FTP Server] --> B[src/utils/ftp_collector.py]
+		C[MySQL Database] --> D[src/utils/sql_collector.py]
+		E[Local Files in data/TEMP_DOWNLOADS] --> F[src/utils/helper.py]
 
-	 B --> E
-	 F --> G[data/CACHE_TEXT]
-	 D --> H[src/collector.py]
-	 G --> H
-	 H --> I[data/master_context.txt]
-	 I --> J[src/utils/vector_processor.py]
-	 J --> K[ChromaDB data/vector_db]
+		B --> E
+		F --> G[data/CACHE_TEXT]
+		D --> H[src/collector.py]
+		G --> H
+		H --> I[data/master_context.txt]
+		I --> J[src/utils/vector_processor.py]
+		J --> K[ChromaDB data/vector_db]
 
-	 L[User / Widget / CLI] --> M[src/server.py /ask]
-	 M --> K
-	 M --> N[LLM API]
-	 K --> M
-	 N --> M
-	 M --> L
+		L[User / Widget / CLI] --> M[src/server.py /ask]
+		M --> K
+		M --> N[LLM API]
+		K --> M
+		N --> M
+		M --> L
 ```
-
-## Supported Inputs
-
-The ingestion pipeline currently handles:
-
-- HTML and PHP pages
-- Plain text files
-- PDF documents
-- DOCX documents
-- Legacy DOC documents
-- Images through the configured vision model
-- Audio files through the configured transcription model
-- SQL records returned by configured database queries
-
-## Notes
-
-- The collector uses cache files and a stored master-context hash to avoid unnecessary embedding rebuilds.
-- ChromaDB storage is recreated when the assembled context changes.
-- The web widget expects the backend `/ask` endpoint to be reachable from the host page.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE).

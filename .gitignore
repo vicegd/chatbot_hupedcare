@@ -7,6 +7,10 @@ venv/
 .env.*
 !.env.structure
 
+# Frontend runtime config
+web/chatbot-config.js
+!web/chatbot-config.structure.js
+
 # Runtime data and logs
 data/
 temp/

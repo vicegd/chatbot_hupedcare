@@ -36,6 +36,12 @@ const translations = {
     // ... (pt, tr, pl dictionaries omitted for brevity, but they are exactly as you wrote them) ...
 };
 
+// Runtime endpoint config loaded from web/chatbot-config.js.
+// Keep a safe fallback for local development.
+const apiUrl = (window.CHATBOT_CONFIG && window.CHATBOT_CONFIG.apiUrl)
+    ? window.CHATBOT_CONFIG.apiUrl
+    : 'http://127.0.0.1:8000/ask';
+
 document.addEventListener('DOMContentLoaded', function() {
     // 2. DOM INJECTION
     // Build the toggle button dynamically.
@@ -140,8 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
             addMessage('', 'bot', true);
 
             // C. Send HTTP request to your FastAPI server
-            // Ensure this URL matches your Linux server's public IP exactly!
-            fetch('http://156.35.98.76:8000/ask', {
+            fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
