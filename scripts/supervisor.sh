@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
 echo "=================================================="
 echo "    SERVER & COLLECTOR SUPERVISOR -- HUPEDCARE"
@@ -16,7 +16,7 @@ if ! pgrep -f "python3 src/server.py" > /dev/null; then
     echo "  - [ALERT] Server is down. Starting it now..."
     
     # Activate the environment first
-    source .venv/bin/activate
+    . .venv/bin/activate
     
     # Start the server in the background. 
     # 'nohup' and '&' are the Linux equivalent of Windows 'start /MIN'.
@@ -33,7 +33,7 @@ fi
 echo ""
 echo "[2/3] Starting data update (collector.py)..."
 # Ensure the environment is activated (in case the if block was skipped)
-source .venv/bin/activate
+. .venv/bin/activate
 python3 src/collector.py
 
 echo ""

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
 echo "=================================================="
 echo "      DEPENDENCY SAVER -- HUPEDCARE"
@@ -17,7 +17,7 @@ if [ ! -d ".venv" ]; then
 fi
 
 echo "[1/2] Activating virtual environment..."
-source .venv/bin/activate
+. .venv/bin/activate
 
 echo "[2/2] Scanning installed libraries and updating requirements.txt..."
 # Use the exact same pip command you had in Windows

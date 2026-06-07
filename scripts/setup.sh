@@ -1,14 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
 echo "=================================================="
 echo "        ENVIRONMENT SETUP -- HUPEDCARE"
 echo "=================================================="
 echo ""
 
-# Navigate to the script's folder, then UP one level to the project root
-cd "$(dirname "$0")/.." || exit
+# Navigate to the script folder and then one level up (project root)
+cd "$(dirname "$0")/.." || exit 1
 
-# Check if the virtual environment directory does NOT exist
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "[ERROR] python3 not found in PATH."
+    exit 1
+fi
+
+# Create virtual environment only when missing
 if [ ! -d ".venv" ]; then
     echo "[1/3] Creating virtual environment .venv..."
     python3 -m venv .venv
@@ -17,12 +22,11 @@ else
 fi
 
 echo "[2/3] Activating the environment..."
-# In Linux, we use 'source' and the path is 'bin' instead of 'Scripts'
-source .venv/bin/activate
+# POSIX-compatible activation (works with /bin/sh)
+. .venv/bin/activate
 
 echo "[3/3] Installing/Updating libraries from requirements.txt..."
-# Send the pip upgrade output to null to keep the console clean, equivalent to >nul
-python3 -m pip install --upgrade pip > /dev/null
+python3 -m pip install --upgrade pip >/dev/null
 pip install -r requirements.txt
 
 echo ""
