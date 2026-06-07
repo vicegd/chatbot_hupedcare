@@ -33,14 +33,62 @@ const translations = {
         error: "Sorry, an error occurred: ",
         connectionError: "Connection error. Please check your internet connection or ensure the server is running."
     },
-    // ... (pt, tr, pl dictionaries omitted for brevity, but they are exactly as you wrote them) ...
+    pt: {
+        header: "Assistente Virtual",
+        typing: "A escrever...",
+        placeholder: "Escreva a sua mensagem...",
+        welcome: "Ola! Sou o seu assistente virtual. Como posso ajudar hoje?",
+        error: "Desculpe, ocorreu um erro: ",
+        connectionError: "Erro de ligacao. Verifique a sua ligacao a internet ou confirme que o servidor esta ligado."
+    },
+    tr: {
+        header: "Sanal Asistan",
+        typing: "Yaziyor...",
+        placeholder: "Mesajinizi yazin...",
+        welcome: "Merhaba! Ben sanal asistaninizim. Bugun size nasil yardim edebilirim?",
+        error: "Uzgunum, bir hata olustu: ",
+        connectionError: "Baglanti hatasi. Lutfen internet baglantinizi kontrol edin veya sunucunun acik oldugundan emin olun."
+    },
+    pl: {
+        header: "Wirtualny Asystent",
+        typing: "Pisze...",
+        placeholder: "Wpisz wiadomosc...",
+        welcome: "Czesc! Jestem Twoim wirtualnym asystentem. Jak moge Ci dzisiaj pomoc?",
+        error: "Przepraszam, wystapil blad: ",
+        connectionError: "Blad polaczenia. Sprawdz polaczenie z internetem lub upewnij sie, ze serwer jest uruchomiony."
+    },
 };
 
 // Runtime endpoint config loaded from web/chatbot-config.js.
-// Keep a safe fallback for local development.
-const apiUrl = (window.CHATBOT_CONFIG && window.CHATBOT_CONFIG.apiUrl)
-    ? window.CHATBOT_CONFIG.apiUrl
-    : 'http://127.0.0.1:8000/ask';
+// Supports `apiUrls` (preferred) and `apiUrl` (backward compatibility).
+function resolveApiUrls() {
+    const cfg = window.CHATBOT_CONFIG || {};
+    const candidates = [];
+
+    if (Array.isArray(cfg.apiUrls)) {
+        for (const url of cfg.apiUrls) {
+            if (typeof url === 'string' && url.trim()) {
+                candidates.push(url.trim());
+            }
+        }
+    }
+
+    if (typeof cfg.apiUrl === 'string' && cfg.apiUrl.trim()) {
+        candidates.push(cfg.apiUrl.trim());
+    }
+
+    const uniqueUrls = [];
+    for (const url of candidates) {
+        if (!uniqueUrls.includes(url)) {
+            uniqueUrls.push(url);
+        }
+    }
+
+    return uniqueUrls;
+}
+
+const apiUrls = resolveApiUrls();
+let preferredApiIndex = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     // 2. DOM INJECTION
@@ -146,25 +194,69 @@ document.addEventListener('DOMContentLoaded', function() {
             addMessage('', 'bot', true);
 
             // C. Send HTTP request to your FastAPI server
-            fetch(apiUrl, {
+            if (apiUrls.length === 0) {
+                addMessage(translations[currentLanguage].connectionError, 'bot');
+                return;
+            }
+
+            const requestPayload = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ question: question })
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Remove typing indicator and show the actual response
-                if (data.response) {
-                    addMessage(data.response, 'bot');
-                } else if (data.error) {
-                    addMessage(translations[currentLanguage].error + data.error, 'bot');
+            };
+
+            const tryEndpoint = (index) => {
+                if (index >= apiUrls.length) {
+                    addMessage(translations[currentLanguage].connectionError, 'bot');
+                    return;
                 }
-            })
-            .catch(error => {
-                addMessage(translations[currentLanguage].connectionError, 'bot');
-            });
+
+                fetch(apiUrls[index], requestPayload)
+                    .then(response => response.json())
+                    .then(data => {
+                        preferredApiIndex = index;
+
+                        // Remove typing indicator and show the actual response
+                        if (data.response) {
+                            addMessage(data.response, 'bot');
+                        } else if (data.error) {
+                            addMessage(translations[currentLanguage].error + data.error, 'bot');
+                        } else {
+                            addMessage(translations[currentLanguage].connectionError, 'bot');
+                        }
+                    })
+                    .catch(() => {
+                        tryEndpoint(index + 1);
+                    });
+            };
+
+            if (preferredApiIndex !== null && preferredApiIndex < apiUrls.length) {
+                const stickyIndex = preferredApiIndex;
+
+                // First try the last known-good endpoint.
+                fetch(apiUrls[stickyIndex], requestPayload)
+                    .then(response => response.json())
+                    .then(data => {
+                        preferredApiIndex = stickyIndex;
+
+                        if (data.response) {
+                            addMessage(data.response, 'bot');
+                        } else if (data.error) {
+                            addMessage(translations[currentLanguage].error + data.error, 'bot');
+                        } else {
+                            addMessage(translations[currentLanguage].connectionError, 'bot');
+                        }
+                    })
+                    .catch(() => {
+                        // If sticky endpoint fails, reset and retry from the start of the list.
+                        preferredApiIndex = null;
+                        tryEndpoint(0);
+                    });
+            } else {
+                tryEndpoint(0);
+            }
         }
     }
 

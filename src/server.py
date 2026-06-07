@@ -71,6 +71,41 @@ load_dotenv()
 config = helper.config
 logger.debug(f"Server project root resolved to {PROJECT_ROOT}")
 
+
+def resolve_public_urls(server_config: dict) -> list[str]:
+    """
+    Resolve external client-facing API base URLs from configuration.
+
+    Required key:
+    1) server.public_urls (list)
+    """
+    urls = []
+
+    configured_list = server_config.get("public_urls")
+    if isinstance(configured_list, list):
+        urls.extend(configured_list)
+
+    normalized = []
+    for raw_url in urls:
+        if not isinstance(raw_url, str):
+            continue
+
+        candidate = raw_url.strip().rstrip("/")
+        parsed = urlparse(candidate)
+        if parsed.scheme and parsed.netloc and candidate not in normalized:
+            normalized.append(candidate)
+
+    if not normalized:
+        raise RuntimeError(
+            "server.public_urls must contain at least one valid URL in config/config.yaml"
+        )
+
+    return normalized
+
+
+PUBLIC_API_BASE_URLS = resolve_public_urls(config.get("server", {}))
+logger.info(f"Configured public API base URLs: {PUBLIC_API_BASE_URLS}")
+
 # Validate critical environment settings early so startup errors are explicit.
 # If the API key is missing, the server refuses to start instead of failing later.
 model_api_key = os.getenv("MODEL_API_KEY")
@@ -196,7 +231,7 @@ async def capture_metrics(request: Request, call_next):
 @app.get("/health")
 async def health_check():
     """Return lightweight service status. Used by load balancers to check if the server is online."""
-    return {"status": "ok"}
+    return {"status": "ok", "public_urls": PUBLIC_API_BASE_URLS}
 
 
 @app.get("/ready")

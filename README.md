@@ -69,7 +69,7 @@ Main runtime settings live in [config/config.yaml](config/config.yaml):
 
 - ai: chat model, vision/transcription models, system prompt, provider base URL.
 - embeddings: embedding model, top_k, chunking, temperature.
-- server: host/port, public_url, CORS allowlist/regex.
+- server: host/port, public_urls (multi-URL), CORS allowlist/regex.
 - storage: data folder root.
 - database: SQL queries injected into the RAG corpus.
 - logger: rotation and verbosity settings.
@@ -79,13 +79,13 @@ Main runtime settings live in [config/config.yaml](config/config.yaml):
 The widget endpoint is externalized from [web/plugin.js](web/plugin.js).
 
 1. Copy [web/chatbot-config.structure.js](web/chatbot-config.structure.js) to web/chatbot-config.js.
-2. Edit window.CHATBOT_CONFIG.apiUrl in web/chatbot-config.js.
+2. Edit window.CHATBOT_CONFIG.apiUrls in web/chatbot-config.js.
 3. Keep web/chatbot-config.js local (it is ignored by [.gitignore](.gitignore)).
 
 Notes:
 
 - [web/index.html](web/index.html) loads chatbot-config.js before plugin.js.
-- Backend source-of-truth for public URL remains [config/config.yaml](config/config.yaml) server.public_url.
+- Backend source-of-truth for public API bases is [config/config.yaml](config/config.yaml) server.public_urls.
 - Keep both values aligned for each environment.
 
 ## Local Run

@@ -33,6 +33,30 @@ logger = logger.setup_logger(logger_name="api_client", log_filename="client.log"
 # line doesn't accidentally bleed into the next line)
 colorama.init(autoreset=True)
 
+
+def resolve_api_endpoints(server_config):
+    """Build a prioritized list of /ask endpoints from server URL settings."""
+    base_urls = []
+
+    public_urls = server_config.get('public_urls')
+    if isinstance(public_urls, list):
+        for url in public_urls:
+            if isinstance(url, str) and url.strip():
+                base_urls.append(url.strip().rstrip('/'))
+
+    if not base_urls:
+        raise ValueError(
+            "server.public_urls must contain at least one base URL in config/config.yaml"
+        )
+
+    # Preserve order while removing duplicates.
+    unique_base_urls = []
+    for url in base_urls:
+        if url not in unique_base_urls:
+            unique_base_urls.append(url)
+
+    return [f"{url}/ask" for url in unique_base_urls]
+
 def chat():
     """
     Run the interactive command-line client for the chatbot API.
@@ -47,12 +71,11 @@ def chat():
     # Reload the config at startup so the CLI always uses the latest server URL.
     config = load_config()
     
-    # Check for the specific 'api_url' first (useful for remote connections), 
-    # and fall back to 'public_url' for local testing.
-    base_url = config['server'].get('api_url', config['server'].get('public_url'))
-    url = f"{base_url}/ask"
-    
-    logger.debug(f"Client configured to use endpoint: {url}")
+    # Support multiple external URLs with graceful fallback.
+    endpoints = resolve_api_endpoints(config['server'])
+    primary_endpoint = endpoints[0]
+
+    logger.debug(f"Client configured endpoints (priority order): {endpoints}")
     
     # ---------------------------------------------------------
     # 2. RENDER THE CLI BANNER
@@ -61,7 +84,9 @@ def chat():
     logger.info(colorama.Style.BRIGHT + colorama.Fore.CYAN + "=" * 50)
     logger.info(colorama.Style.BRIGHT + colorama.Fore.CYAN + "       HUPEDCARE CHATBOT - RESEARCH ASSISTANT")
     logger.info(colorama.Style.BRIGHT + colorama.Fore.CYAN + "=" * 50)
-    logger.info(f"Connected to: {colorama.Fore.YELLOW}{url}")
+    logger.info(f"Primary endpoint: {colorama.Fore.YELLOW}{primary_endpoint}")
+    if len(endpoints) > 1:
+        logger.info(f"Fallback endpoints: {colorama.Fore.YELLOW}{', '.join(endpoints[1:])}")
     logger.info(f"Type {colorama.Fore.RED}'exit'{colorama.Fore.RESET} to close the session.\n")
     
     # ---------------------------------------------------------
@@ -87,14 +112,29 @@ def chat():
 
             # B. API REQUEST
             # Send the question as a JSON payload to the FastAPI server
-            response = requests.post(url, json={"question": question})
-            logger.debug(f"Received HTTP status {response.status_code} from backend")
+            response = None
+            last_connection_error = None
+            selected_endpoint = None
+
+            for endpoint in endpoints:
+                try:
+                    response = requests.post(endpoint, json={"question": question}, timeout=30)
+                    selected_endpoint = endpoint
+                    logger.debug(f"Received HTTP status {response.status_code} from {endpoint}")
+                    break
+                except requests.exceptions.ConnectionError as error:
+                    last_connection_error = error
+                    logger.warning(f"Endpoint unavailable, trying next: {endpoint}")
+
+            if response is None:
+                raise requests.exceptions.ConnectionError(last_connection_error)
 
             # C. PROCESS AND DISPLAY RESPONSE
             if response.status_code == 200:
                 # The API contract returns the generated answer under the 'response' key.
                 answer = response.json().get('response', 'No response provided by server.')
                 logger.debug(f"Received answer with length {len(answer)}")
+                logger.debug(f"Answer served from endpoint: {selected_endpoint}")
                 
                 # Render the AI's response (Blue for the arrows, White for the actual text)
                 logger.info(
