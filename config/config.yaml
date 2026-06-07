@@ -119,12 +119,12 @@ storage:
 # ============================================================================
 server:
   host: "0.0.0.0"
-  port: 8000
+  port: 8080
   # External client-facing API base URLs (without /ask).
   # Use this list when you need multiple addresses (LAN, public IP, reverse proxy, etc.).
   public_urls:
-    - "http://127.0.0.1:8000"
-    - "http://156.35.98.76:8000"
+    - "http://127.0.0.1:8080"
+    - "http://156.35.98.76:8080"
 
   # Explicit CORS allowlist for production frontend origins.
   allowed_origins:
