@@ -20,8 +20,8 @@ How the pipeline works (Step-by-Step):
    it against its internal memory (`metadata`). It ONLY downloads files that 
    are brand new or have been recently modified.
 4. GHOST PURGE: If a human deletes a document from the remote FTP server, this 
-   script detects the absence and deletes the local copy. This guarantees the 
-   AI will not provide answers based on outdated or deleted policies.
+   script detects the absence and deletes the local physical copy. This guarantees 
+   the AI will not provide answers based on outdated or deleted policies.
 =============================================================================
 """
 
@@ -50,7 +50,7 @@ def sync_ftp_files(metadata, temp_folder):
     updated_files = []
     
     # We use a Set to keep track of every file we see on the server today.
-    # Later, we compare this against our memory to see if anything was deleted.
+    # Later, we compare this against our memory and local drive to see if anything was deleted.
     remote_files_found = set()
     
     # Only mirror the file types that have downstream extractors in the helper.py.
@@ -139,27 +139,32 @@ def sync_ftp_files(metadata, temp_folder):
         # ---------------------------------------------------------
         # 3. GHOST PURGE (Delete local files that were removed remotely)
         # ---------------------------------------------------------
-        stored_paths = list(metadata.keys())
-        logger.debug(f"Metadata entries tracked before cleanup: {len(stored_paths)}")
+        logger.debug("Starting Ghost Purge comparing local physical files with remote state...")
         
-        # We loop through our memory. If a file is in our memory but wasn't seen 
-        # during the walk (`remote_files_found`), it means someone deleted it from the server.
+        # A. Delete orphaned physical files from the local hard drive
+        for root, _, files in os.walk(temp_folder):
+            for file_name in files:
+                local_full_path = os.path.join(root, file_name)
+                
+                # Reconstruct the expected remote path for this local file
+                rel_path = os.path.relpath(local_full_path, temp_folder).replace("\\", "/")
+                
+                # Ensure the path matches the structure of remote_root
+                expected_remote_path = f"{remote_root.rstrip('/')}/{rel_path}"
+
+                # If the local physical file is NOT in the list of files currently on the FTP...
+                if expected_remote_path not in remote_files_found:
+                    logger.info(f"Orphan physical file detected: {local_full_path} -> Deleting...")
+                    try:
+                        os.remove(local_full_path)
+                    except Exception as e:
+                        logger.error(f"Error deleting physical file {local_full_path}: {e}")
+
+        # B. Clean the memory (metadata) of old references
+        stored_paths = list(metadata.keys())
         for path_in_meta in stored_paths:
             if path_in_meta not in remote_files_found:
-                logger.info(f"Was first deleted on server: {path_in_meta} -> Cleaning local copy...")
-                
-                # Calculate where the file is stored locally
-                rel_path = os.path.relpath(path_in_meta, remote_root)
-                local_to_delete = os.path.join(temp_folder, rel_path)
-                
-                # Delete the physical file from the local hard drive
-                if os.path.exists(local_to_delete):
-                    try:
-                        os.remove(local_to_delete)
-                    except Exception as e:
-                        logger.error(f"Error deleting {local_to_delete}: {e}")
-
-                # Delete the entry from our memory
+                logger.debug(f"Removing deleted file from memory: {path_in_meta}")
                 del metadata[path_in_meta]
 
         # Close the connection politely

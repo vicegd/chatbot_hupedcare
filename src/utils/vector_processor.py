@@ -22,11 +22,13 @@ How the pipeline works (Step-by-Step):
    knowledge base. This prevents duplicates and ensures the AI only remembers 
    the absolute latest version of the files.
 5. VECTORIZATION: It sends the chunks to the Embedding model, turns them into 
-   mathematical coordinates (vectors), and saves them into the database.
+   mathematical coordinates (vectors), and saves them into the database in batches
+   to avoid exceeding API token limits.
 =============================================================================
 """
 
 import os
+import time
 import warnings
 
 import chromadb
@@ -49,7 +51,7 @@ def update_vector_db():
 
     The function reads the assembled context file, splits it into semantic
     chunks, recreates the `rag_context` collection, and uploads the new
-    documents so retrieval stays aligned with the latest ingested data.
+    documents in batches so retrieval stays aligned with the latest ingested data.
     """
     config = helper.config
     
@@ -94,7 +96,8 @@ def update_vector_db():
     
     # Execute the split
     chunks = text_splitter.split_text(full_text)
-    logger.debug(f"Generated {len(chunks)} chunks for embedding")
+    total_chunks = len(chunks)
+    logger.debug(f"Generated {total_chunks} chunks for embedding")
 
     # ---------------------------------------------------------
     # 4. CHROMADB DATABASE RESET
@@ -120,14 +123,32 @@ def update_vector_db():
     )
 
     # ---------------------------------------------------------
-    # 5. VECTORIZATION AND STORAGE
+    # 5. BATCH VECTORIZATION AND STORAGE
     # ---------------------------------------------------------
-    # This is the "heavy lifting" step. It sends all the chunks to the embedding 
-    # model, gets the vectors back, and saves them permanently to the hard drive.
-    collection.add(
-        documents=chunks,
-        # Generate simple unique IDs for each chunk (id_0, id_1, id_2...)
-        ids=[f"id_{i}" for i in range(len(chunks))]
-    )
+    # We process chunks in batches to avoid OpenAI's "max_tokens_per_request" limits.
+    BATCH_SIZE = 150  # Safe number of chunks per HTTP request
     
-    logger.info(f"Success: {len(chunks)} fragments indexed and saved to Vector Database.")
+    logger.info(f"Starting vectorization in batches of {BATCH_SIZE}...")
+    
+    for i in range(0, total_chunks, BATCH_SIZE):
+        batch_chunks = chunks[i : i + BATCH_SIZE]
+        batch_ids = [f"id_{j}" for j in range(i, i + len(batch_chunks))]
+        
+        try:
+            collection.add(
+                documents=batch_chunks,
+                ids=batch_ids
+            )
+            # CAMBIADO a .info y mejorado el texto para ver el progreso real
+            logger.info(f"   -> Insertados {min(i + BATCH_SIZE, total_chunks)} de {total_chunks} fragmentos en la BD...")
+            
+            # Small pause to respect API rate limits (RPM - Requests Per Minute)
+            time.sleep(0.5)
+            
+        except Exception as e:
+            logger.error(f"Error vectorizing batch starting at chunk {i}: {e}")
+            raise  # Re-raise the exception to stop the pipeline if embedding fails
+            
+    logger.info(f"Success: {total_chunks} fragments indexed and saved to Vector Database.")
+
+    

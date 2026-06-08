@@ -13,6 +13,7 @@ web/chatbot-config.js
 
 # Runtime data and logs
 data/
+data2/
 temp/
 logs/
 *.log

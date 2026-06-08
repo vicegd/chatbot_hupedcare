@@ -41,6 +41,14 @@ import utils.logger as logger
 # Initialize the logger specifically for the SQL collection process
 logger = logger.setup_logger(logger_name="sql_collector", log_filename="sql_collector.log")
 
+
+def _parse_int_setting(value, default):
+    try:
+        parsed = int(value)
+        return parsed if parsed > 0 else default
+    except (TypeError, ValueError):
+        return default
+
 def collect_sql_data(config):
     """
     Collect and normalize SQL data for inclusion in the master context.
@@ -58,17 +66,40 @@ def collect_sql_data(config):
     try:
         # 1. Establish Secure Database Connection
         logger.debug("Opening MySQL connection for SQL collection")
+ 
+        sql_settings = config.get("database", {})
+        query_timeout_seconds = _parse_int_setting(
+            os.getenv("SQL_QUERY_TIMEOUT_SECONDS", sql_settings.get("query_timeout_seconds", 20)),
+            20,
+        )
+        max_rows_per_query = _parse_int_setting(
+            os.getenv("SQL_MAX_ROWS_PER_QUERY", sql_settings.get("max_rows_per_query", 1000)),
+            1000,
+        )
+        fetch_batch_size = _parse_int_setting(
+            os.getenv("SQL_FETCH_BATCH_SIZE", sql_settings.get("fetch_batch_size", 200)),
+            200,
+        )
+
         connection = mysql.connector.connect(
             host=os.getenv("DB_HOST"),
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
             database=os.getenv("DB_NAME"),
-            port=3306
+            port=3306,
+            connection_timeout=query_timeout_seconds,
+            consume_results=True,
         )
-        
+
         # dictionary=True makes sure rows come back as dicts (e.g., row['post_title']) 
         # instead of unlabelled tuples, making the code much easier to read.
-        cursor = connection.cursor(dictionary=True)
+        cursor = connection.cursor(dictionary=True, buffered=False)
+
+        try:
+            cursor.execute(f"SET SESSION max_execution_time = {query_timeout_seconds * 1000}")
+        except Exception:
+            # Some MySQL variants may not support max_execution_time.
+            logger.debug("Session max_execution_time not supported by this MySQL server")
         
         # 2. Fetch Queries from Configuration
         # By keeping queries in config.yaml, non-programmers can add new data sources.
@@ -83,10 +114,21 @@ def collect_sql_data(config):
         for query in queries:
             logger.debug(f"Executing SQL query: {query}")
             cursor.execute(query)
-            rows = cursor.fetchall()
-            logger.debug(f"Rows returned by query: {len(rows)}")
-            
-            for row in rows:
+            processed_rows = 0
+
+            while True:
+                rows = cursor.fetchmany(fetch_batch_size)
+                if not rows:
+                    break
+
+                for row in rows:
+                    processed_rows += 1
+                    if processed_rows > max_rows_per_query:
+                        logger.warning(
+                            f"Row cap reached ({max_rows_per_query}) for query. Remaining rows were skipped."
+                        )
+                        break
+
                 header = ""
                 content = ""
                 
@@ -133,7 +175,7 @@ def collect_sql_data(config):
                 
                 # 1. Remove hidden HTML/WordPress block comments (e.g., )
                 # (Note: Fixed the regex pattern to actually target HTML comments)
-                clean_content = re.sub(r'', '', content, flags=re.DOTALL)
+                clean_content = re.sub(r'<!--.*?-->', '', content, flags=re.DOTALL)
                 
                 # 2. Parse and strip all HTML tags (turns <strong>Hello</strong> into Hello)
                 soup = BeautifulSoup(clean_content, 'html.parser')
@@ -153,6 +195,11 @@ def collect_sql_data(config):
                 
                 if final_text.strip():
                     text_output += f"{final_text}\n"
+
+                if processed_rows >= max_rows_per_query:
+                    break
+
+            logger.debug(f"Rows processed from query: {processed_rows}")
         
         # Close connection politely to free up database resources
         connection.close()
