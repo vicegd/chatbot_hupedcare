@@ -163,6 +163,11 @@ def sync_ftp_files(metadata, temp_folder):
         # B. Clean the memory (metadata) of old references
         stored_paths = list(metadata.keys())
         for path_in_meta in stored_paths:
+            # Ignore internal system variables to prevent wiping the orchestrator's memory
+            if path_in_meta in ["last_collector_run_ts", "master_context_hash"]:
+                continue
+                
+            # Only delete if it is a file path that no longer exists on the FTP server
             if path_in_meta not in remote_files_found:
                 logger.debug(f"Removing deleted file from memory: {path_in_meta}")
                 del metadata[path_in_meta]

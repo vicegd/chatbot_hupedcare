@@ -172,7 +172,7 @@ def run_collector():
                 expected_cache_files.add(relative_path.replace(os.sep, "_") + ".txt")
 
         # If a text file exists in the cache but its original raw file is gone, delete the cache
-        for cache_file_name in os.listdir(cache_text_dir):
+        for cache_file_name in sorted(os.listdir(cache_text_dir)):
             if cache_file_name not in expected_cache_files:
                 logger.info(f"Cleanup: Removing {cache_file_name} (no longer on server)")
                 os.remove(os.path.join(cache_text_dir, cache_file_name))
