@@ -23,7 +23,7 @@ fi
 
 echo "[2/3] Activating the environment..."
 # POSIX-compatible activation (works with /bin/sh)
-. .venv/bin/activate
+source .venv/bin/activate
 
 echo "[3/3] Installing/Updating libraries from requirements.txt..."
 python3 -m pip install --upgrade pip >/dev/null
