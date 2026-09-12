@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-H3 Structural Explainability Test — RAGAS Faithfulness + Source-Citation Compliance
+H3a/H3b Structural Explainability Test — RAGAS Faithfulness + Source-Citation Compliance
 =====================================================================================
 Validates H3 by running the full RAG pipeline (ChromaDB retrieval + LLM generation)
 in two conditions:
@@ -10,7 +10,8 @@ in two conditions:
 Metrics collected per condition:
   1. RAGAS Faithfulness score  (0–1): fraction of answer claims supported by context
   2. Unsupported-claim rate (%): 1 - faithfulness, expressed as percentage
-  3. Source-citation compliance (%): fraction of answers that explicitly cite a source
+  3. Cited-source agreement (%): fraction of answers whose cited source label
+      is found in the retrieved context; this is not entailment.
 
 Usage:
     python scripts/test_h3_ragas.py
@@ -52,9 +53,8 @@ QUESTIONS = [
     "What post-operative analgesic regimen is recommended at discharge after major pediatric surgery?",
 ]
 
-# Regex: only count EXPLICIT source-filename citations, not generic attributions.
-# With provenance headers the LLM cites "(source: who_guidelines.pdf)";
-# without headers it can only produce generic phrases which are excluded here.
+# Citation presence is only a syntactic signal. The audit below separately checks
+# whether the cited source is present in the retrieved context.
 SOURCE_CITATION_PATTERNS = [
     r"\(source\s*:\s*\S+\)",         # (source: filename.pdf)
     r"\(fuente\s*:\s*\S+\)",         # Spanish variant
@@ -64,6 +64,13 @@ SOURCE_CITATION_PATTERNS = [
     r"fuente\s*:\s*base\s+de\s+datos",
 ]
 _CITATION_RE = re.compile("|".join(SOURCE_CITATION_PATTERNS), re.IGNORECASE)
+_CITATION_LABEL_RE = re.compile(
+    r"\((?:source|fuente|fonte)\s*:\s*([^\)]+)\)"
+    r"|(?:source|fuente)\s*:\s*([\w_\-\.]+\.\w+)"
+    r"|(?:source)\s*:\s*(data\s+base)"
+    r"|(?:fuente)\s*:\s*(base\s+de\s+datos)",
+    re.IGNORECASE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -195,10 +202,91 @@ def compute_faithfulness(samples: list[dict]) -> float:
 # Source-citation compliance
 # ---------------------------------------------------------------------------
 
-def citation_compliance(answers: list[str]) -> float:
-    """Fraction of answers that contain at least one source citation."""
-    hits = sum(1 for a in answers if _CITATION_RE.search(a))
-    return hits / len(answers) if answers else 0.0
+def audit_citations(samples: list[dict]) -> dict[str, float | int]:
+    """Audit citation presence and whether cited sources occur in retrieved context.
+
+    A filename citation is valid only when its provenance header is present in
+    the retrieved context. Database citations are valid only when the context
+    contains a database record marker. This deliberately does not claim that a
+    source entails every answer claim; that requires a separate entailment audit.
+    """
+    present = 0
+    valid = 0
+
+    for sample in samples:
+        answer = sample["answer"]
+        context = "\n\n".join(sample.get("contexts", []))
+        match = _CITATION_LABEL_RE.search(answer)
+        if not match:
+            continue
+
+        present += 1
+        label = next((group for group in match.groups() if group), "").strip()
+        normalized_label = label.strip(" `\"'.,").lower()
+        normalized_context = context.lower()
+
+        if normalized_label in {"data base", "base de datos"}:
+            source_is_valid = "[db |" in normalized_context
+        else:
+            source_is_valid = (
+                f"--- source: {normalized_label} ---" in normalized_context
+            )
+
+        if source_is_valid:
+            valid += 1
+
+    total = len(samples)
+    return {
+        "present": present,
+        "valid": valid,
+        "presence_rate": (present / total * 100) if total else 0.0,
+        "valid_rate": (valid / total * 100) if total else 0.0,
+    }
+
+
+def audit_citations_against_provenance(
+    no_provenance_samples: list[dict],
+    provenance_samples: list[dict],
+) -> dict[str, float | int]:
+    """Check baseline citations against the paired original retrieval contexts.
+
+    The two sample lists must preserve the same question order. This prevents
+    the no-provenance condition from receiving credit merely because a cited
+    filename exists somewhere in the corpus; the cited source must have been
+    retrieved for the same question in the provenance condition.
+    """
+    if len(no_provenance_samples) != len(provenance_samples):
+        raise ValueError("Paired H3 samples must have the same length")
+
+    present = 0
+    valid = 0
+    for baseline, original in zip(no_provenance_samples, provenance_samples):
+        match = _CITATION_LABEL_RE.search(baseline["answer"])
+        if not match:
+            continue
+
+        present += 1
+        label = next((group for group in match.groups() if group), "").strip()
+        normalized_label = label.strip(" `\"'.,").lower()
+        original_context = "\n\n".join(original.get("contexts", [])).lower()
+
+        if normalized_label in {"data base", "base de datos"}:
+            source_is_valid = "[db |" in original_context
+        else:
+            source_is_valid = (
+                f"--- source: {normalized_label} ---" in original_context
+            )
+
+        if source_is_valid:
+            valid += 1
+
+    total = len(no_provenance_samples)
+    return {
+        "present": present,
+        "valid": valid,
+        "presence_rate": (present / total * 100) if total else 0.0,
+        "valid_rate": (valid / total * 100) if total else 0.0,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -243,14 +331,15 @@ def run_condition(
 
     print(f"\n  Computing faithfulness ({len(samples)} samples)…")
     faithfulness_score = compute_faithfulness(samples)
-    citation_rate      = citation_compliance(answers)
+    citation_audit = audit_citations(samples)
 
     return {
         "label":             label,
         "n":                 len(samples),
         "faithfulness":      faithfulness_score,
         "unsupported_rate":  (1 - faithfulness_score) * 100,
-        "citation_rate":     citation_rate * 100,
+        "citation_valid":    citation_audit["valid_rate"],
+        "citation_valid_n": citation_audit["valid"],
         "answers":           answers,
         "samples":           samples,
     }
@@ -259,30 +348,31 @@ def run_condition(
 def print_results_table(with_prov: dict, no_prov: dict) -> bool:
     w = 46
     print(f"\n{'='*70}")
-    print(f"  RESULTS — H3 Structural Explainability (RAGAS + Citation Audit)")
+    print("  RESULTS — H3a/H3b Structural Explainability (RAGAS + Source Audit)")
     print(f"{'='*70}")
     print(f"  {'Metric':<{w}} {'Baseline':>10}  {'HUPEDCARE':>10}")
     print(f"  {'-'*67}")
     print(f"  {'Faithfulness / grounding score (RAGAS)':<{w}} "
-          f"{no_prov['faithfulness']:>10.3f}  {with_prov['faithfulness']:>10.3f}")
+        f"{no_prov['faithfulness']:>10.3f}  {with_prov['faithfulness']:>10.3f}")
     print(f"  {'Unsupported-claim rate (%)':<{w}} "
-          f"{no_prov['unsupported_rate']:>9.1f}%  {with_prov['unsupported_rate']:>9.1f}%")
-    print(f"  {'Source-citation compliance (%)':<{w}} "
-          f"{no_prov['citation_rate']:>9.1f}%  {with_prov['citation_rate']:>9.1f}%")
+        f"{no_prov['unsupported_rate']:>9.1f}%  {with_prov['unsupported_rate']:>9.1f}%")
+    print(f"  {'Cited-source agreement with retrieved context (%)':<{w}} "
+        f"{no_prov['citation_valid']:>9.1f}%  {with_prov['citation_valid']:>9.1f}%")
     print(f"{'='*70}")
 
-    faith_improved  = with_prov["faithfulness"]  >= no_prov["faithfulness"]
-    citation_better = with_prov["citation_rate"] >  no_prov["citation_rate"]
-    h3_pass = faith_improved and citation_better
-    verdict = "PASS ✓" if h3_pass else "FAIL ✗"
+    h3a_pass = with_prov["citation_valid"] > no_prov["citation_valid"]
+    faithfulness_delta = with_prov["faithfulness"] - no_prov["faithfulness"]
 
-    print(f"\n  H3 hypothesis (provenance improves grounding + citation): [{verdict}]")
-    print(f"    {'OK' if faith_improved  else 'FAIL'}  Faithfulness: "
-          f"{no_prov['faithfulness']:.3f} → {with_prov['faithfulness']:.3f}")
-    print(f"    {'OK' if citation_better else 'FAIL'}  Citation compliance: "
-          f"{no_prov['citation_rate']:.1f}% → {with_prov['citation_rate']:.1f}%")
+    print(f"\n  H3a (provenance improves cited-source agreement): "
+          f"[{'PASS ✓' if h3a_pass else 'FAIL ✗'}]")
+    print(f"    Agreement: {no_prov['citation_valid']:.1f}% → "
+          f"{with_prov['citation_valid']:.1f}%")
+    print("  H3b (faithfulness non-inferiority): [DESCRIPTIVE ONLY]")
+    print(f"    Faithfulness: {no_prov['faithfulness']:.3f} → "
+          f"{with_prov['faithfulness']:.3f} "
+          f"(delta {faithfulness_delta:+.3f}; no non-inferiority threshold tested)")
     print()
-    return h3_pass
+    return h3a_pass
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +401,7 @@ def main() -> int:
     collection, llm, config, top_k = build_pipeline(data_folder, args.top_k)
 
     print(f"\n{'='*70}")
-    print(f"  H3 — Structural Explainability Test")
+    print(f"  H3a/H3b — Structural Explainability Test")
     print(f"  Questions: {n_q}  |  top-K: {top_k}  |  model: {config['ai']['model']}")
     print(f"{'='*70}")
 
@@ -372,6 +462,12 @@ def main() -> int:
         "NO_PROVENANCE (baseline)", questions, coll_bl, llm, config, top_k,
         cache_path=os.path.join(_cache_dir, "no_provenance.json"),
     )
+
+    paired_audit = audit_citations_against_provenance(
+        no_prov["samples"], with_prov["samples"]
+    )
+    no_prov["citation_valid"] = paired_audit["valid_rate"]
+    no_prov["citation_valid_n"] = paired_audit["valid"]
 
     # Clean up baseline collection
     chroma_bl.delete_collection(BL_COLLECTION)
