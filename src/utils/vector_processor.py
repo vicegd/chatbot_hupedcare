@@ -27,7 +27,9 @@ How the pipeline works (Step-by-Step):
 =============================================================================
 """
 
+import bisect
 import os
+import re
 import time
 import warnings
 
@@ -44,6 +46,44 @@ import utils.logger as logger
 
 # Initialize the logger specifically for the vector processing events
 logger = logger.setup_logger(logger_name="vector_processor", log_filename="vector_processor.log")
+
+_PROVENANCE_MARKER_RE = re.compile(r"^(?:--- SOURCE: .+? ---|\[DB \|[^\]]*\])", re.MULTILINE)
+
+
+def attach_chunk_provenance(full_text, chunks):
+    """
+    Prefix each chunk that does not start with a provenance marker with the marker
+    in force at its first character, so every chunk can be attributed on its own.
+    """
+    markers = list(_PROVENANCE_MARKER_RE.finditer(full_text))
+    positions = [marker.start() for marker in markers]
+    labelled = []
+    cursor = 0
+    for chunk in chunks:
+        start = full_text.find(chunk, cursor)
+        if start == -1 or _PROVENANCE_MARKER_RE.match(chunk):
+            labelled.append(chunk)
+        else:
+            index = bisect.bisect_right(positions, start) - 1
+            labelled.append(f"{markers[index].group(0)}\n{chunk}" if index >= 0 else chunk)
+        if start != -1:
+            cursor = start + 1
+    return labelled
+
+
+def build_chunks(full_text, config):
+    """Split the corpus with the production settings and label every chunk with its source."""
+    # The 'RecursiveCharacterTextSplitter' tries to split the text using the
+    # separators in order. By prioritizing "\n--- SOURCE: " and "\n[DB | ", we
+    # keep data from the same file or database record grouped together as much
+    # as possible before splitting by paragraphs or lines.
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=config['embeddings']['max_chunk_size'],
+        chunk_overlap=config['embeddings']['chunk_overlap'],
+        separators=["\n--- SOURCE: ", "\n[DB | ", "\n\n", "\n", " ", ""]
+    )
+    return attach_chunk_provenance(full_text, text_splitter.split_text(full_text))
+
 
 def update_vector_db():
     """
@@ -82,20 +122,7 @@ def update_vector_db():
     # 3. SEMANTIC CHUNKING
     # ---------------------------------------------------------
     # We cannot feed the whole text to the database at once. We must chunk it.
-    # The 'RecursiveCharacterTextSplitter' tries to split the text using the 
-    # separators in order. 
-    # 
-    # Advanced feature: By prioritizing "\n--- SOURCE: " and "\n[DB | ", we 
-    # force the system to keep data from the same file or database record 
-    # grouped together as much as possible before splitting by paragraphs or lines.
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=config['embeddings']['max_chunk_size'], # E.g., 1100 characters per chunk
-        chunk_overlap=config['embeddings']['chunk_overlap'], # E.g., 200 characters of overlap to keep context flow
-        separators=["\n--- SOURCE: ", "\n[DB | ", "\n\n", "\n", " ", ""]
-    )
-    
-    # Execute the split
-    chunks = text_splitter.split_text(full_text)
+    chunks = build_chunks(full_text, config)
     total_chunks = len(chunks)
     logger.debug(f"Generated {total_chunks} chunks for embedding")
 

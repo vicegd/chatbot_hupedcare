@@ -145,16 +145,8 @@ database:
   queries:
     # Query 1: Published posts/pages only.
     # Excludes drafts, revisions, and menu items to avoid noisy content.
-    - "SELECT post_title, post_content, post_type, post_date FROM wp_posts WHERE post_status = 'publish' AND post_type IN ('post', 'page')"
+    - "SELECT post_title, post_content, post_type, post_date FROM wp_posts WHERE post_status = 'publish' AND post_type IN ('post', 'page') ORDER BY ID"
 
-    # Query 2: Approved user comments.
-    # Excludes pingbacks/trackbacks/spam to keep user-generated data relevant.
-    - "SELECT comment_author, comment_content, comment_date FROM wp_comments WHERE comment_approved = '1' AND comment_type IN ('comment', '')"
-
-    # Query 3: Platform users/authors.
-    # Adds authority context so the assistant can reference official contributors.
-    - "SELECT display_name, user_email, user_registered FROM wp_users"
-
-    # Query 4: Taxonomy metadata (categories/tags) with at least one linked post.
+    # Query 2: Taxonomy metadata (categories/tags) with at least one linked post.
     # Helps retrieval understand site structure and topic hierarchy.
-    - "SELECT t.name AS term_name, tt.taxonomy, tt.description FROM wp_terms t INNER JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id WHERE tt.count > 0"
+    - "SELECT t.name AS term_name, tt.taxonomy, tt.description FROM wp_terms t INNER JOIN wp_term_taxonomy tt ON t.term_id = tt.term_id WHERE tt.count > 0 ORDER BY tt.term_taxonomy_id"

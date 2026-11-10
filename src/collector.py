@@ -164,12 +164,14 @@ def run_collector():
         # ---------------------------------------------------------
         logger.info("2. PURGING ORPHANED CACHE FILES...")
         # Build a list of what files SHOULD be in the cache based on currently downloaded files
-        expected_cache_files = set()
+        # Maps each flattened cache filename to the original relative path, because
+        # flattening cannot be reversed from the name alone.
+        expected_cache_files = {}
         for root, _, files in os.walk(temp_downloads_dir):
             for file_name in files:
                 # Flatten the path to create a stable text mirror filename
                 relative_path = os.path.relpath(os.path.join(root, file_name), temp_downloads_dir)
-                expected_cache_files.add(relative_path.replace(os.sep, "_") + ".txt")
+                expected_cache_files[relative_path.replace(os.sep, "_") + ".txt"] = relative_path.replace(os.sep, "/")
 
         # If a text file exists in the cache but its original raw file is gone, delete the cache
         for cache_file_name in sorted(os.listdir(cache_text_dir)):
@@ -230,9 +232,11 @@ def run_collector():
         # 6. ADD CACHED FILES WITH SOURCE CITATION HEADERS
         # ---------------------------------------------------------
         logger.info("6. ADDING CACHED FILES WITH SOURCE HEADERS...")
-        for cache_file_name in os.listdir(cache_text_dir):
-            # Reconstruct the original filename to use as a citation label
-            source_label = cache_file_name.replace(".txt", "").replace("_", "/")
+        # Sorted so that the corpus, its line de-duplication and its hash do not
+        # depend on directory listing order.
+        for cache_file_name in sorted(os.listdir(cache_text_dir)):
+            # The original relative path is the citation label
+            source_label = expected_cache_files[cache_file_name]
             source_added = False
             
             with open(os.path.join(cache_text_dir, cache_file_name), "r", encoding="utf-8") as file_handle:
