@@ -131,7 +131,7 @@ Exploratory, added after the results were seen: chunk F1 is broken down by the r
 
 ## Second automated judge (added 2026-11-10)
 
-Added after the results of the first judge were seen and before any verdict of the second. It is a sensitivity analysis and does not replace the first judge. The judge is mistralai/mistral-large-2512 through OpenRouter, an open-weight model from a provider that wrote no answer in the study, with temperature 0 requested. scripts/eval_second_judge.py runs it with the prompts of the first judge on:
+Added after the results of the first judge were seen and before any verdict of the second. It is a sensitivity analysis and does not replace the first judge. The judge is deepseek/deepseek-v4-flash through OpenRouter, an open-weight model from a provider that wrote no answer in the study, with temperature 0 requested, reasoning disabled, and DeepInfra as the only provider. It replaced mistralai/mistral-large-2512, whose run was stopped after 1,731 of 8,365 verdicts because of rate limits. Only counts of those verdicts were seen, never their agreement with the first judge, and they are not used. scripts/eval_second_judge.py runs it with the prompts of the first judge on:
 
 - the claims already extracted by the first judge for the five analysed methods and top_chunk, in the three models, so that differences come from the verdict and not from the extraction, which remains an OpenAI step;
 - the same control pairs;
