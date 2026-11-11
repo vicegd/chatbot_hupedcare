@@ -47,3 +47,7 @@ Thumbs.db
 
 # Project-local notes
 TODO.txt
+# Study material that is not published: only experiments/open_corpus is public
+experiments/open_corpus_private/
+experiments/synthetic_corpus/
+experiments/paper_versions/

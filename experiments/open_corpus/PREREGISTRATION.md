@@ -99,6 +99,10 @@ Each item shows one sentence and one passage: for the random and doubted sentenc
 
 Both automated judges rate the same 60 items, with the verification prompt, on the same sentence and passage. Reported outcomes: Cohen's kappa between raters with raw agreement and the share rated supported; acceptance of the control pairs; sensitivity and specificity of each judge against agreed human ratings, on the non-control items, weighted by the inverse of each stratum's sampling fraction, and the unweighted values on the random stratum. The share supported per method is no longer an outcome, since 7 items per method do not support it. A sentence supported only by another cited passage counts as unsupported for raters and judges alike, so the comparison between them remains valid. The rating does not assess clinical accuracy.
 
+### Third amendment to the human rating (2026-11-10)
+
+Written after the answers of the first rater were seen and before those of any other rater were received. More than two raters may take part. An item counts as agreed only when all raters give the same verdict, after reducing each answer to supported (yes) or not supported (partially or no). Other items stay in the data as not agreed. Agreement between raters is reported with Cohen's kappa if there are two raters and Fleiss' kappa if there are more. The automated judges have not been run on the 60 items at the time of writing.
+
 ## Query translation (added after the language results were seen)
 
 Attribution was worse in Turkish and Polish, and the gold document reached the model less often. This second experiment tests one mitigation. It is reported as a separate study, designed after those results.
